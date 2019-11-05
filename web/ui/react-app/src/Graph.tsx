@@ -82,7 +82,7 @@ class Graph extends PureComponent<GraphProps> {
       return (y / 1e-9).toFixed(2) + 'n';
     } else if (abs_y <= 1e-6) {
       return (y / 1e-6).toFixed(2) + 'µ';
-    } else if (abs_y <= 1e-3) {
+    } else if (abs_y < 1e-2) {
       return (y / 1e-3).toFixed(2) + 'm';
     } else if (abs_y <= 1) {
       return y.toFixed(2);
