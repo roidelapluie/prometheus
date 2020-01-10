@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"testing"
@@ -30,26 +31,46 @@ import (
 // queryLogLine is a basic representation of a query log line.
 type queryLogLine map[string]interface{}
 
-func enableQueryLog(t *testing.T, configFile *os.File, queryLogFile string) {
+func enableQueryLog(t *testing.T, port int, configFile *os.File, queryLogFile string) {
 	err := configFile.Truncate(0)
 	testutil.Ok(t, err)
 	_, err = configFile.Seek(0, 0)
 	testutil.Ok(t, err)
 	_, err = configFile.Write([]byte(fmt.Sprintf("global:\n  query_log_file: %s\n", queryLogFile)))
 	testutil.Ok(t, err)
-	postReloadConfig(t)
+	postReloadConfig(t, port)
 }
 
-func postReloadConfig(t *testing.T) {
-	r, err := http.Post("http://127.0.0.1:9090/-/reload", "text/plain", nil)
+func postReloadConfig(t *testing.T, port int) {
+	r, err := http.Post(fmt.Sprintf("http://127.0.0.1:%d/-/reload", port), "text/plain", nil)
 	testutil.Ok(t, err)
 	testutil.Equals(t, 200, r.StatusCode)
 }
 
-func disableQueryLog(t *testing.T, configFile *os.File) {
+func disableQueryLog(t *testing.T, port int, configFile *os.File) {
 	err := configFile.Truncate(0)
 	testutil.Ok(t, err)
-	postReloadConfig(t)
+	postReloadConfig(t, port)
+}
+
+type queryOpts struct {
+	useIPV6 bool
+	query   string
+	port    int
+}
+
+func query(t *testing.T, o queryOpts) {
+	host := "127.0.0.1"
+	if o.useIPV6 {
+		host = "[::1]"
+	}
+	_, err := http.Get(fmt.Sprintf(
+		"http://%s:%d/api/v1/query?query=%s",
+		host,
+		o.port,
+		url.QueryEscape(o.query),
+	))
+	testutil.Ok(t, err)
 }
 
 func readQueryLog(t *testing.T, path string) []queryLogLine {
@@ -69,6 +90,7 @@ func TestQueryLog(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
+	port := 9091
 
 	queryLogFile, err := ioutil.TempFile("", "query")
 	testutil.Ok(t, err)
@@ -77,20 +99,19 @@ func TestQueryLog(t *testing.T) {
 	testutil.Ok(t, err)
 	defer os.Remove(queryLogFile.Name())
 
-	prom := exec.Command(promPath, "--config.file="+configFile.Name(), "--web.enable-lifecycle")
+	prom := exec.Command(promPath, "--config.file="+configFile.Name(), "--web.enable-lifecycle", fmt.Sprintf("--web.listen-address=0.0.0.0:%d", port))
 	testutil.Ok(t, prom.Start())
 	defer func() {
 		prom.Process.Signal(os.Interrupt)
 		prom.Wait()
 	}()
 
-	testutil.Ok(t, waitForPrometheus())
+	testutil.Ok(t, waitForPrometheus(port))
 
-	enableQueryLog(t, configFile, queryLogFile.Name())
+	enableQueryLog(t, port, configFile, queryLogFile.Name())
 	testutil.Equals(t, 0, len(readQueryLog(t, queryLogFile.Name())))
 
-	_, err = http.Get("http://127.0.0.1:9090/api/v1/query?query=time()")
-	testutil.Ok(t, err)
+	query(t, queryOpts{port: port, query: "time()"})
 	ql := readQueryLog(t, queryLogFile.Name())
 	testutil.Equals(t, 1, len(ql))
 	testutil.Equals(t, ql[0]["query"].(string), "time()")
@@ -98,22 +119,19 @@ func TestQueryLog(t *testing.T) {
 	testutil.Equals(t, ql[0]["path"].(string), "/api/v1/query")
 	testutil.Equals(t, ql[0]["method"].(string), "GET")
 
-	_, err = http.Get("http://[::1]:9090/api/v1/query?query=vector(1)%20")
-	testutil.Ok(t, err)
+	query(t, queryOpts{port: port, query: "vector(1) ", useIPV6: true})
 	ql = readQueryLog(t, queryLogFile.Name())
 	testutil.Equals(t, 2, len(ql))
 	testutil.Equals(t, ql[1]["query"].(string), "vector(1) ")
 	testutil.Equals(t, ql[1]["clientIP"].(string), "::1")
 
-	disableQueryLog(t, configFile)
-	_, err = http.Get("http://127.0.0.1:9090/api/v1/query?query=time()")
-	testutil.Ok(t, err)
+	disableQueryLog(t, port, configFile)
+	query(t, queryOpts{port: port, query: "time()"})
 	ql = readQueryLog(t, queryLogFile.Name())
 	testutil.Equals(t, 2, len(ql))
 
-	enableQueryLog(t, configFile, queryLogFile.Name())
-	_, err = http.Get("http://127.0.0.1:9090/api/v1/query?query=time()")
-	testutil.Ok(t, err)
+	enableQueryLog(t, port, configFile, queryLogFile.Name())
+	query(t, queryOpts{port: port, query: "time()"})
 	ql = readQueryLog(t, queryLogFile.Name())
 	testutil.Equals(t, 3, len(ql))
 
@@ -125,26 +143,25 @@ func TestQueryLog(t *testing.T) {
 	ql = readQueryLog(t, newFile.Name())
 	testutil.Equals(t, 3, len(ql))
 
-	_, err = http.Get("http://127.0.0.1:9090/api/v1/query?query=time()")
+	query(t, queryOpts{port: port, query: "time()"})
 	testutil.Ok(t, err)
 	ql = readQueryLog(t, newFile.Name())
 	testutil.Equals(t, 4, len(ql))
 
 	// Reload config, Prometheus should write to the new file..
-	postReloadConfig(t)
-	_, err = http.Get("http://127.0.0.1:9090/api/v1/query?query=time()")
-	testutil.Ok(t, err)
+	postReloadConfig(t, port)
+	query(t, queryOpts{port: port, query: "time()"})
 	ql = readQueryLog(t, newFile.Name())
 	testutil.Equals(t, 4, len(ql))
 	ql = readQueryLog(t, queryLogFile.Name())
 	testutil.Equals(t, 1, len(ql))
 }
 
-func waitForPrometheus() error {
+func waitForPrometheus(port int) error {
 	var err error
 	for x := 0; x < 10; x++ {
 		// error=nil means prometheus has started so can send the interrupt signal and wait for the grace shutdown.
-		if _, err = http.Get("http://localhost:9090/graph"); err == nil {
+		if _, err = http.Get(fmt.Sprintf("http://localhost:%d/graph", port)); err == nil {
 			break
 		}
 		time.Sleep(500 * time.Millisecond)
