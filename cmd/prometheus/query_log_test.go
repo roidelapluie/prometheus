@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/tsdb/testutil"
+	"github.com/prometheus/prometheus/util/testutil"
 )
 
 // queryLogLine is a basic representation of a query log line.
