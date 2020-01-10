@@ -14,12 +14,9 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -286,130 +283,4 @@ func TestWALSegmentSizeBounds(t *testing.T) {
 			t.Errorf("unable to retrieve the exit status for prometheus: %v", err)
 		}
 	}
-}
-
-// queryLogLine is a basic representation of a query log line.
-type queryLogLine map[string]interface{}
-
-func TestQueryLog(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
-	}
-
-	queryLogFile, err := ioutil.TempFile("", "query")
-	testutil.Ok(t, err)
-	defer os.Remove(queryLogFile.Name())
-	configFile, err := ioutil.TempFile("", "config")
-	testutil.Ok(t, err)
-	defer os.Remove(queryLogFile.Name())
-
-	reloadConfig := func() {
-		r, err := http.Post("http://127.0.0.1:9090/-/reload", "text/plain", nil)
-		testutil.Ok(t, err)
-		testutil.Equals(t, 200, r.StatusCode)
-	}
-
-	enableQueryLog := func() {
-		err := configFile.Truncate(0)
-		testutil.Ok(t, err)
-		_, err = configFile.Seek(0, 0)
-		testutil.Ok(t, err)
-		_, err = configFile.Write([]byte(fmt.Sprintf("global:\n  query_log_file: %s\n", queryLogFile.Name())))
-		testutil.Ok(t, err)
-		reloadConfig()
-	}
-
-	disableQueryLog := func() {
-		err := configFile.Truncate(0)
-		testutil.Ok(t, err)
-		reloadConfig()
-	}
-
-	readQueryLog := func(f string) []queryLogLine {
-		ql := []queryLogLine{}
-		file, err := os.Open(f)
-		testutil.Ok(t, err)
-		defer file.Close()
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			var q queryLogLine
-			testutil.Ok(t, json.Unmarshal(scanner.Bytes(), &q))
-			ql = append(ql, q)
-		}
-		return ql
-	}
-
-	prom := exec.Command(promPath, "--config.file="+configFile.Name(), "--web.enable-lifecycle")
-	testutil.Ok(t, prom.Start())
-	defer func() {
-		prom.Process.Signal(os.Interrupt)
-		prom.Wait()
-	}()
-
-	testutil.Ok(t, waitForPrometheus())
-
-	enableQueryLog()
-	testutil.Equals(t, len(readQueryLog(queryLogFile.Name())), 0)
-
-	_, err = http.Get("http://127.0.0.1:9090/api/v1/query?query=time()")
-	testutil.Ok(t, err)
-	ql := readQueryLog(queryLogFile.Name())
-	testutil.Equals(t, 1, len(ql))
-	testutil.Equals(t, ql[0]["query"].(string), "time()")
-	testutil.Equals(t, ql[0]["clientIP"].(string), "127.0.0.1")
-	testutil.Equals(t, ql[0]["path"].(string), "/api/v1/query")
-	testutil.Equals(t, ql[0]["method"].(string), "GET")
-
-	_, err = http.Get("http://[::1]:9090/api/v1/query?query=vector(1)%20")
-	testutil.Ok(t, err)
-	ql = readQueryLog(queryLogFile.Name())
-	testutil.Equals(t, 2, len(ql))
-	testutil.Equals(t, ql[1]["query"].(string), "vector(1) ")
-	testutil.Equals(t, ql[1]["clientIP"].(string), "::1")
-
-	disableQueryLog()
-	_, err = http.Get("http://127.0.0.1:9090/api/v1/query?query=time()")
-	testutil.Ok(t, err)
-	ql = readQueryLog(queryLogFile.Name())
-	testutil.Equals(t, 2, len(ql))
-
-	enableQueryLog()
-	_, err = http.Get("http://127.0.0.1:9090/api/v1/query?query=time()")
-	testutil.Ok(t, err)
-	ql = readQueryLog(queryLogFile.Name())
-	testutil.Equals(t, 3, len(ql))
-
-	// Move the file, Prometheus should still write to the old file.
-	newFile, err := ioutil.TempFile("", "newLoc")
-	testutil.Ok(t, err)
-	defer os.Remove(newFile.Name())
-	testutil.Ok(t, os.Rename(queryLogFile.Name(), newFile.Name()))
-	ql = readQueryLog(newFile.Name())
-	testutil.Equals(t, 3, len(ql))
-
-	_, err = http.Get("http://127.0.0.1:9090/api/v1/query?query=time()")
-	testutil.Ok(t, err)
-	ql = readQueryLog(newFile.Name())
-	testutil.Equals(t, 4, len(ql))
-
-	// Reload config, Prometheus should write to the new file..
-	reloadConfig()
-	_, err = http.Get("http://127.0.0.1:9090/api/v1/query?query=time()")
-	testutil.Ok(t, err)
-	ql = readQueryLog(newFile.Name())
-	testutil.Equals(t, 4, len(ql))
-	ql = readQueryLog(queryLogFile.Name())
-	testutil.Equals(t, 1, len(ql))
-}
-
-func waitForPrometheus() error {
-	var err error
-	for x := 0; x < 10; x++ {
-		// error=nil means prometheus has started so can send the interrupt signal and wait for the grace shutdown.
-		if _, err = http.Get("http://localhost:9090/graph"); err == nil {
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	return err
 }
