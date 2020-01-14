@@ -31,6 +31,7 @@ import (
 	"github.com/prometheus/prometheus/util/testutil"
 )
 
+var cwd string
 var promPath string
 var promConfig = filepath.Join("..", "..", "documentation", "examples", "prometheus.yml")
 var promData = filepath.Join(os.TempDir(), "data")
@@ -44,12 +45,12 @@ func TestMain(m *testing.M) {
 	os.Setenv("no_proxy", "localhost,127.0.0.1,0.0.0.0,:")
 
 	var err error
-	promPath, err = os.Getwd()
+	cwd, err = os.Getwd()
 	if err != nil {
 		fmt.Printf("can't get current dir :%s \n", err)
 		os.Exit(1)
 	}
-	promPath = filepath.Join(promPath, "prometheus")
+	promPath = filepath.Join(cwd, "prometheus")
 
 	build := exec.Command("go", "build", "-o", promPath)
 	output, err := build.CombinedOutput()
