@@ -207,6 +207,8 @@ func newServer(t *testing.T) (*httptest.Server, *SDConfig) {
 			response = ServicesTestAnswer
 		case "/v1/catalog/services?wait=30000ms":
 			response = ServicesTestAnswer
+		case "/v1/catalog/services?filter=ServiceMeta.environment+%3D%3D+staging&wait=30000ms":
+			response = ServicesTestAnswer
 		case "/v1/catalog/services?index=1&node-meta=rack_name%3A2304&stale=&wait=30000ms":
 			time.Sleep(5 * time.Second)
 			response = ServicesTestAnswer
@@ -269,6 +271,21 @@ func TestOneService(t *testing.T) {
 	defer stub.Close()
 
 	config.Services = []string{"test"}
+	d := newDiscovery(t, config)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ch := make(chan []*targetgroup.Group)
+	go d.Run(ctx, ch)
+	checkOneTarget(t, <-ch)
+	cancel()
+}
+
+// Watch only the test service using meta.
+func TestOneServiceWithServiceMeta(t *testing.T) {
+	stub, config := newServer(t)
+	defer stub.Close()
+
+	config.Filter = "ServiceMeta.environment == staging"
 	d := newDiscovery(t, config)
 
 	ctx, cancel := context.WithCancel(context.Background())

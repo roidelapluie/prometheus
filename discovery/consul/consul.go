@@ -120,6 +120,9 @@ type SDConfig struct {
 	ServiceTags []string `yaml:"tags,omitempty"`
 	// Desired node metadata.
 	NodeMeta map[string]string `yaml:"node_meta,omitempty"`
+	// Filter requests filtering data prior to it being returned. The string
+	// is a go-bexpr compatible expression.
+	Filter string `yaml:"filter,omitempty"`
 
 	TLSConfig config_util.TLSConfig `yaml:"tls_config,omitempty"`
 }
@@ -156,6 +159,7 @@ type Discovery struct {
 	watchedServices  []string // Set of services which will be discovered.
 	watchedTags      []string // Tags used to filter instances of a service.
 	watchedNodeMeta  map[string]string
+	watchedFilter    string
 	allowStale       bool
 	refreshInterval  time.Duration
 	finalizer        func()
@@ -206,6 +210,7 @@ func NewDiscovery(conf *SDConfig, logger log.Logger) (*Discovery, error) {
 		watchedServices:  conf.Services,
 		watchedTags:      conf.ServiceTags,
 		watchedNodeMeta:  conf.NodeMeta,
+		watchedFilter:    conf.Filter,
 		allowStale:       conf.AllowStale,
 		refreshInterval:  time.Duration(conf.RefreshInterval),
 		clientDatacenter: conf.Datacenter,
@@ -352,6 +357,7 @@ func (d *Discovery) watchServices(ctx context.Context, ch chan<- []*targetgroup.
 		WaitTime:   watchTimeout,
 		AllowStale: d.allowStale,
 		NodeMeta:   d.watchedNodeMeta,
+		Filter:     d.watchedFilter,
 	}
 	srvs, meta, err := catalog.Services(opts.WithContext(ctx))
 	elapsed := time.Since(t0)

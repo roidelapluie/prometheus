@@ -7,6 +7,7 @@ require (
 	github.com/Azure/azure-sdk-for-go v23.2.0+incompatible
 	github.com/Azure/go-autorest v11.2.8+incompatible
 	github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4
+	github.com/armon/go-metrics v0.3.0 // indirect
 	github.com/aws/aws-sdk-go v1.25.48
 	github.com/cespare/xxhash v1.1.0
 	github.com/dgryski/go-sip13 v0.0.0-20190329191031-25c5027a8c7b
@@ -19,7 +20,11 @@ require (
 	github.com/google/pprof v0.0.0-20190723021845-34ac40c74b70
 	github.com/gophercloud/gophercloud v0.3.0
 	github.com/grpc-ecosystem/grpc-gateway v1.9.5
-	github.com/hashicorp/consul/api v1.1.0
+	github.com/hashicorp/consul/api v1.3.0
+	github.com/hashicorp/go-immutable-radix v1.1.0 // indirect
+	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
+	github.com/hashicorp/golang-lru v0.5.4 // indirect
+	github.com/hashicorp/serf v0.8.5 // indirect
 	github.com/influxdata/influxdb v1.7.7
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.7
