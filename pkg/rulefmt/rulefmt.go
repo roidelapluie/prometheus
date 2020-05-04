@@ -14,6 +14,7 @@
 package rulefmt
 
 import (
+	"bytes"
 	"context"
 	"io/ioutil"
 	"strings"
@@ -259,6 +260,12 @@ func testTemplateParsing(rl *RuleNode) (errs []error) {
 	return errs
 }
 
+func decoder(content []byte) *yaml.Decoder {
+	d := yaml.NewDecoder(bytes.NewReader(content))
+	d.KnownFields(true)
+	return d
+}
+
 // Parse parses and validates a set of rules.
 func Parse(content []byte) (*RuleGroups, []error) {
 	var (
@@ -267,12 +274,11 @@ func Parse(content []byte) (*RuleGroups, []error) {
 		errs   []error
 	)
 
-	err := yaml.Unmarshal(content, &groups)
-	if err != nil {
+	if err := decoder(content).Decode(&groups); err != nil {
 		errs = append(errs, err)
 	}
-	err = yaml.Unmarshal(content, &node)
-	if err != nil {
+
+	if err := decoder(content).Decode(&node); err != nil {
 		errs = append(errs, err)
 	}
 

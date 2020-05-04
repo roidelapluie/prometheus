@@ -67,6 +67,10 @@ func TestParseFileFailure(t *testing.T) {
 			filename: "invalid_record_name.bad.yaml",
 			errMsg:   "invalid recording rule name",
 		},
+		{
+			filename: "invented_field.bad.yaml",
+			errMsg:   "field anotations not found in type rulefmt.RuleNode",
+		},
 	}
 
 	for _, c := range table {
