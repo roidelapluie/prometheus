@@ -67,6 +67,7 @@ jobs:
           curl -o go.msi https://dl.google.com/go/go1.14.3.windows-amd64.msi
           msiexec /i go.msi /quiet
           rm ./go.msi
+          go version
     - run:
         shell: bash
         command: |
