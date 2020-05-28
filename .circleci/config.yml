@@ -59,6 +59,13 @@ jobs:
     working_directory: /go/src/github.com/prometheus/prometheus
     steps:
     - checkout
+    # temporary workaround until circleci updates go.
+    - run:
+        shell: bash
+        command: |
+          curl -o go.msi https://dl.google.com/go/go1.14.3.windows-amd64.msi
+          ./go.msi
+          rm ./go1.14.3.windows-amd64.msi
     - run:
         shell: bash
         command: |
