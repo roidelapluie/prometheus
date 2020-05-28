@@ -63,9 +63,11 @@ jobs:
     - run:
         shell: bash
         command: |
-          curl -o go.msi https://dl.google.com/go/go1.14.3.windows-amd64.msi
+          set -e
+          curl -.o go.msi https://dl.google.com/go/go1.14.3.windows-amd64.msi
+          file go.msi
           ./go.msi
-          rm ./go1.14.3.windows-amd64.msi
+          rm ./go.msi
     - run:
         shell: bash
         command: |
