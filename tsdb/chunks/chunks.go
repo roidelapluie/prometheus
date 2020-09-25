@@ -32,6 +32,12 @@ import (
 	"github.com/prometheus/prometheus/tsdb/fileutil"
 )
 
+var chunkstats = map[string]*struct {
+	chunks        int
+	chunkssize    uint64
+	chunkssamples int
+}{}
+
 // Segment header fields constants.
 const (
 	// MagicChunks is 4 bytes at the head of a series file.
@@ -481,6 +487,7 @@ type Reader struct {
 	cs   []io.Closer // Closers for resources behind the byte slices.
 	size int64       // The total size of bytes in the reader.
 	pool chunkenc.Pool
+	dir  string
 }
 
 func newReader(bs []ByteSlice, cs []io.Closer, pool chunkenc.Pool) (*Reader, error) {
@@ -536,6 +543,7 @@ func NewDirReader(dir string, pool chunkenc.Pool) (*Reader, error) {
 		merr.Add(closeAll(cs))
 		return nil, merr
 	}
+	reader.dir = dir
 	return reader, nil
 }
 
@@ -597,7 +605,29 @@ func (s *Reader) Chunk(ref uint64) (chunkenc.Chunk, error) {
 
 	chkData := sgmBytes.Range(chkDataStart, chkDataEnd)
 	chkEnc := sgmBytes.Range(chkEncStart, chkEncStart+ChunkEncodingSize)[0]
-	return s.pool.Get(chunkenc.Encoding(chkEnc), chkData)
+	chu, err := s.pool.Get(chunkenc.Encoding(chkEnc), chkData)
+	if _, ok := chunkstats[s.dir]; !ok {
+		chunkstats[s.dir] = &struct {
+			chunks        int
+			chunkssize    uint64
+			chunkssamples int
+		}{
+			chunks:        0,
+			chunkssamples: 0,
+			chunkssize:    0,
+		}
+	}
+	chunkstats[s.dir].chunks += 1
+	chunkstats[s.dir].chunkssamples += chu.NumSamples()
+	chunkstats[s.dir].chunkssize += chkDataLen
+
+	return chu, err
+}
+
+func PrintStats() {
+	for b, s := range chunkstats {
+		fmt.Printf("%v,%v,%v,%v\n", b, s.chunks, s.chunkssize, s.chunkssamples)
+	}
 }
 
 func nextSequenceFile(dir string) (string, int, error) {
