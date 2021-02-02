@@ -1529,6 +1529,9 @@ func (ev *evaluator) vectorSelector(node *parser.VectorSelector, ts int64) (Vect
 // vectorSelectorSingle evaluates a instant vector for the iterator of one time series.
 func (ev *evaluator) vectorSelectorSingle(it *storage.BufferedSeriesIterator, node *parser.VectorSelector, ts int64) (int64, float64, bool) {
 	refTime := ts - durationMilliseconds(node.Offset)
+	if node.Timestamp != nil {
+		refTime = *node.Timestamp
+	}
 	var t int64
 	var v float64
 
