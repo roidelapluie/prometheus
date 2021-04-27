@@ -16,7 +16,9 @@ package relabel
 import (
 	"crypto/md5"
 	"fmt"
+	"math"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -54,6 +56,8 @@ const (
 	LabelDrop Action = "labeldrop"
 	// LabelKeep drops any label not matching the regex.
 	LabelKeep Action = "labelkeep"
+	// FormatFloat formats floats from a label into the OpenMetrics format.
+	FormatFloat Action = "formatfloat"
 )
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -114,6 +118,9 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 	if c.Action == HashMod && !model.LabelName(c.TargetLabel).IsValid() {
 		return errors.Errorf("%q is invalid 'target_label' for %s action", c.TargetLabel, c.Action)
+	}
+	if c.Action == FormatFloat && len(c.SourceLabels) != 1 {
+		return errors.Errorf("%s action takes exactly one source label", c.Action)
 	}
 
 	if c.Action == LabelDrop || c.Action == LabelKeep {
@@ -247,6 +254,13 @@ func relabel(lset labels.Labels, cfg *Config) labels.Labels {
 				lb.Del(l.Name)
 			}
 		}
+	case FormatFloat:
+		f, err := strconv.ParseFloat(val, 64)
+		if err != nil {
+			lb.Del(cfg.TargetLabel)
+			break
+		}
+		lb.Set(cfg.TargetLabel, formatOpenMetricsFloat(f))
 	default:
 		panic(errors.Errorf("relabel: unknown relabel action type %q", cfg.Action))
 	}
@@ -264,4 +278,27 @@ func sum64(hash [md5.Size]byte) uint64 {
 		s |= uint64(b) << shift
 	}
 	return s
+}
+
+func formatOpenMetricsFloat(f float64) string {
+	switch {
+	case f == 1:
+		return "1.0"
+	case f == 0:
+		return "0.0"
+	case f == -1:
+		return "-1.0"
+	case math.IsNaN(f):
+		return "NaN"
+	case math.IsInf(f, +1):
+		return "+Inf"
+	case math.IsInf(f, -1):
+		return "-Inf"
+	default:
+		str := strconv.FormatFloat(f, 'g', -1, 64)
+		if !strings.ContainsAny(str, "e.") {
+			str += ".0"
+		}
+		return str
+	}
 }

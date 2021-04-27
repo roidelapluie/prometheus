@@ -428,6 +428,23 @@ func TestRelabel(t *testing.T) {
 				"a": "foo",
 			}),
 		},
+		{
+			input: labels.FromMap(map[string]string{
+				"a":  "foo",
+				"le": "1",
+			}),
+			relabel: []*Config{
+				{
+					Action:       FormatFloat,
+					SourceLabels: model.LabelNames{"le"},
+					TargetLabel:  "le",
+				},
+			},
+			output: labels.FromMap(map[string]string{
+				"a":  "foo",
+				"le": "1.0",
+			}),
+		},
 	}
 
 	for _, test := range tests {
