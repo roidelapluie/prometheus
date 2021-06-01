@@ -30,6 +30,7 @@ import (
 	_ "github.com/prometheus/prometheus/discovery/marathon"     // register marathon
 	_ "github.com/prometheus/prometheus/discovery/moby"         // register moby
 	_ "github.com/prometheus/prometheus/discovery/openstack"    // register openstack
+	_ "github.com/prometheus/prometheus/discovery/puppetdb"     // register puppetdb
 	_ "github.com/prometheus/prometheus/discovery/scaleway"     // register scaleway
 	_ "github.com/prometheus/prometheus/discovery/triton"       // register triton
 	_ "github.com/prometheus/prometheus/discovery/zookeeper"    // register zookeeper
