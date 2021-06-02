@@ -1053,6 +1053,12 @@ url: <string>
 query: <string>
 
 # Whether to include the parameters as labels.
+# Due to the differences between parameter types and Prometheus labels,
+# some parameters might not be rendered. The format of the parameters might
+# also change in future releases.
+#
+# Note: Enabling this exposes parameters in the Prometheus UI and API. Make sure
+# that you don't have secrets exposed as parameters if you enable this.
 [ include_parameters: <boolean> | default = false ]
 
 # Refresh interval to re-read the resources list.
