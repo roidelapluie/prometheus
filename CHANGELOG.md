@@ -1,4 +1,4 @@
-## 2.35.0-rc0 / 2022-04-08
+## 2.35.0-alpha4 / 2022-04-08
 
 * [CHANGE] TSDB: Delete *.tmp WAL files when Prometheus starts. #10317
 * [CHANGE] promtool: Add new flag `--lint` (enabled by default) for the commands `check rules` and `check config`, resulting in a new exit code (`3`) for linter errors. #10435
