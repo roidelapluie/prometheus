@@ -18,7 +18,7 @@
     "@forevolve/bootstrap-dark": "^1.0.0",
     "@fortawesome/fontawesome-svg-core": "6.1.1",
     "@fortawesome/free-solid-svg-icons": "6.1.1",
-    "@fortawesome/react-fontawesome": "0.1.17",
+    "@fortawesome/react-fontawesome": "0.1.18",
     "@nexucis/fuzzy": "^0.3.0",
     "@nexucis/kvsearch": "^0.5.0",
     "bootstrap": "^4.6.1",
