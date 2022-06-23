@@ -63,24 +63,28 @@ import (
 	binaries: [string] | *[]
 
 	if len(binaries) == 0 {
-		#_build & {
-			client: client
-			cmd:    cmd
+		_b: #_build & {
+			"client": client
+			"cmd":    cmd
 		}
+		output: [
+			_b.output,
+		]
 	}
 
 	if len(binaries) > 0 {
-		_b: #_build & {
-			client: client
-			cmd:    cmd
+		_c: #_build & {
+			"client": client
+			"cmd":    cmd
 		}
-		output: [
-			core.#Copy & {
-				input:    _b.output
-				contents: client.filesystem."."
+		_copy: core.#Copy & {
+				input:    _c.output.rootfs
+				contents: client.filesystem.".".write.contents
 				source:   "/app/prometheus"
 				dest:     "prometheus"
-			}.outputs,
+			},
+		output: [
+			_copy.output,
 		]
 	}
 }
