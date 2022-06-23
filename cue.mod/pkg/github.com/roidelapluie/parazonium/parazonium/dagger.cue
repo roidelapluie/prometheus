@@ -74,11 +74,13 @@ import (
 			client: client
 			cmd:    cmd
 		}
-		core.#Copy & {
-			input:    _b.output.rootfs
-			contents: client.filesystem.".".fs
-			source:   "/app/prometheus"
-			dest:     "prometheus"
-		}
+		output: [
+			core.#Copy & {
+				input:    _b.output
+				contents: client.filesystem."."
+				source:   "/app/prometheus"
+				dest:     "prometheus"
+			}.outputs,
+		]
 	}
 }
