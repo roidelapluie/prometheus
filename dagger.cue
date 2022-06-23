@@ -13,8 +13,7 @@ dagger.#Plan & {
 	actions: {
 		test:  parazonium.#Build & {"client": client, cmd: "make test GO_ONLY=1"}
 		ui:  parazonium.#Build & {"client": client, cmd: "make assets-tarball ui-lint ui-test"}
-		uitest:  parazonium.#Build & {"client": client, cmd: "make ui-install && make ui-build-module && make ui-test"}
-		build: parazonium.#Build & {"client": client, cmd: "make build"}
+		build: parazonium.#Build & {"client": client, cmd: "make build", binaries: ["prometheus"]}
 		all:   core.#Nop & {input: [test.output, build.output, ui.output]}
 	}
 }

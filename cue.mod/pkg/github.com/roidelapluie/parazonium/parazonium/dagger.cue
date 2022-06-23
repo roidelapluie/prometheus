@@ -7,7 +7,7 @@ import (
 	"universe.dagger.io/docker"
 )
 
-#Build: {
+#_build: {
 	client: _
 	cmd:    string
 	_promu: core.#ReadFile & {
@@ -54,5 +54,31 @@ import (
 			}
 		}
 		workdir: "/app"
+	}
+}
+
+#Build: {
+	client:   _
+	cmd:      string
+	binaries: [string] | *[]
+
+	if len(binaries) == 0 {
+		#_build & {
+			client: client
+			cmd:    cmd
+		}
+	}
+
+	if len(binaries) > 0 {
+		_b: #_build & {
+			client: client
+			cmd:    cmd
+		}
+		core.#Copy & {
+			input:    _b.output.rootfs
+			contents: client.filesystem.".".fs
+			source:   "/app/prometheus"
+			dest:     "prometheus"
+		}
 	}
 }
