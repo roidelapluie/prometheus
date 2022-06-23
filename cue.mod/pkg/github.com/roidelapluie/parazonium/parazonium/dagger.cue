@@ -7,7 +7,7 @@ import (
 	"universe.dagger.io/docker"
 )
 
-#_build: {
+_#build: {
 	client: _
 	cmd:    string
 	_promu: core.#ReadFile & {
@@ -63,7 +63,7 @@ import (
 	binaries: [string] | *[]
 
 	if len(binaries) == 0 {
-		_b: #_build & {
+		_b: _#build & {
 			"client": client
 			"cmd":    cmd
 		}
@@ -73,7 +73,7 @@ import (
 	}
 
 	if len(binaries) > 0 {
-		_c: #_build & {
+		_c: _#build & {
 			"client": client
 			"cmd":    cmd
 		}
