@@ -15,15 +15,15 @@ _#build: {
 
 	_promu: core.#ReadFile & {
 		"input": _source
-        "path":  ".promu.yml"
+		"path":  ".promu.yml"
 	}
 	_goVersion: strconv.FormatFloat(yaml.Unmarshal(_promu.contents).go.version, 102, 2, 64)
 
-	_image:     docker.#Pull & {
+	_image: docker.#Pull & {
 		"source": "quay.io/prometheus/golang-builder:" + _goVersion + "-base"
 	}
 
-	_app: core.#Copy & {
+	_app: docker.#Copy & {
 		"input":    _image.output
 		"contents": _source
 		"dest":     "/app"
@@ -61,11 +61,6 @@ _#build: {
 			}
 		}
 		workdir: "/app"
-		//export: {
-		//for _, b in binaries {
-		//	files: {"/app/prometheus": _}
-		//}
-		//}
 	}
 }
 
@@ -80,20 +75,17 @@ _#build: {
 		_binaries: binaries
 	}
 	if len(binaries) == 0 {
-		output: [
-			_build.output,
-		]
+		output: _build.output
 	}
 
 	if len(binaries) > 0 {
-		//_copy: core.#Copy & {
-		//	input:    _b.export.files."/app/prometheus"
-		//	contents: source
-		//	"source": "/prometheus"
-		//	dest:     "prometheus"
-		//}
-		output: [
-			_build.output,
-		]
+		_export: core.#Copy & {
+			input:    dagger.#Scratch
+			contents: _build.output.rootfs
+			source:   "/app/prometheus"
+			dest:     "/prometheus"
+		}
+
+		output: _export.output
 	}
 }
