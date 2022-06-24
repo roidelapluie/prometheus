@@ -3,25 +3,36 @@ package parazonium
 import (
 	"encoding/yaml"
 	"strconv"
+	"dagger.io/dagger"
 	"dagger.io/dagger/core"
 	"universe.dagger.io/docker"
 )
 
 _#build: {
-	client: _
-	cmd:    string
+	_cmd:    string
+	_source: dagger.#FS
+	_binaries: [string]
+
 	_promu: core.#ReadFile & {
-		input: client.filesystem.".".read.contents
-		path:  ".promu.yml"
+		"input": _source
+        "path":  ".promu.yml"
 	}
 	_goVersion: strconv.FormatFloat(yaml.Unmarshal(_promu.contents).go.version, 102, 2, 64)
-	_builder:   docker.#Pull & {
-		source: "quay.io/prometheus/golang-builder:" + _goVersion + "-base"
+
+	_image:     docker.#Pull & {
+		"source": "quay.io/prometheus/golang-builder:" + _goVersion + "-base"
 	}
+
+	_app: core.#Copy & {
+		"input":    _image.output
+		"contents": _source
+		"dest":     "/app"
+	}
+
 	docker.#Run & {
-		input: _builder.output
+		"input": _app.output
 		entrypoint: ["/bin/bash", "-c"]
-		command: name: cmd
+		command: name: _cmd
 		env: {
 			GOMODCACHE:       _modCachePath
 			npm_config_cache: _npmCachePath
@@ -30,10 +41,6 @@ _#build: {
 		_buildCachePath: "/go-build-cache"
 		_npmCachePath:   "/npm-build-cache"
 		mounts: {
-			app: {
-				dest:     "/app"
-				contents: client.filesystem.".".read.contents
-			}
 			"go mod cache": {
 				contents: core.#CacheDir & {
 					id: "go_mod"
@@ -54,37 +61,39 @@ _#build: {
 			}
 		}
 		workdir: "/app"
+		//export: {
+		//for _, b in binaries {
+		//	files: {"/app/prometheus": _}
+		//}
+		//}
 	}
 }
 
 #Build: {
-	client:   _
+	source:   dagger.#FS
 	cmd:      string
 	binaries: [string] | *[]
 
+	_build: _#build & {
+		_source:   source
+		_cmd:      cmd
+		_binaries: binaries
+	}
 	if len(binaries) == 0 {
-		_b: _#build & {
-			"client": client
-			"cmd":    cmd
-		}
 		output: [
-			_b.output,
+			_build.output,
 		]
 	}
 
 	if len(binaries) > 0 {
-		_c: _#build & {
-			"client": client
-			"cmd":    cmd
-		}
-		_copy: core.#Copy & {
-				input:    _c.output.rootfs
-				contents: client.filesystem.".".write.contents
-				source:   "/app/prometheus"
-				dest:     "prometheus"
-			},
+		//_copy: core.#Copy & {
+		//	input:    _b.export.files."/app/prometheus"
+		//	contents: source
+		//	"source": "/prometheus"
+		//	dest:     "prometheus"
+		//}
 		output: [
-			_copy.output,
+			_build.output,
 		]
 	}
 }
