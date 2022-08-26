@@ -12,12 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/setup_environment
-        with:
-          enable_go: true
-      - run: make GO_ONLY=1
+      - run: make GO_ONLY=1 SKIP_GOLANGCI_LINT=1
       - run: go test ./tsdb/ -test.tsdb-isolation=false
-      - run: make -c documentation/examples/remote_storage
-      - run: make -c documentation/examples
+      - run: make -C documentation/examples/remote_storage
+      - run: make -C documentation/examples
 #      - prometheus/check_proto:
 #          version: "3.15.8"
 #      - prometheus/store_artifact:
