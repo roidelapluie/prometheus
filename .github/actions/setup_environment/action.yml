@@ -17,3 +17,4 @@ runs:
         restore-keys: |
           ${{ runner.os }}-go-
     - run: make promu
+      shell: bash
