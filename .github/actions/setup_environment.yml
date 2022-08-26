@@ -1,0 +1,19 @@
+name: Setup environment
+inputs:
+  enable_go:
+    type: boolean
+    description: Whether to enable go specific features, such as caching.
+    default: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v3
+      if: ${{ github.event.inputs.enable_go }}
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    - run: make promu
