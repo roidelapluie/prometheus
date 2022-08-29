@@ -8,7 +8,7 @@ runs:
   using: composite
   steps:
     - run: |
-        curl -s -L https://github.com/protocolbuffers/protobuf/releases/download/v${INPUT_VERSION}/protoc-${INPUT_VERSION}-linux-x86_64.zip > /tmp/protoc.zip
+        curl -s -L https://github.com/protocolbuffers/protobuf/releases/download/v$INPUT_VERSION/protoc-$INPUT_VERSION-linux-x86_64.zip > /tmp/protoc.zip
         unzip -d /tmp /tmp/protoc.zip
         chmod +x /tmp/bin/protoc
         echo 'export PATH=/tmp/bin:$PATH' >> $BASH_ENV
