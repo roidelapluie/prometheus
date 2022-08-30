@@ -86,7 +86,7 @@ jobs:
     if: |
       !(github.event_name == 'create' && github.event.ref_type != 'tag' && !startsWith(github.event.ref, 'v2'))
       &&
-      !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-')
+      !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-'))
     strategy:
       matrix:
         thread: [ 0, 1, 2 ]
@@ -104,7 +104,7 @@ jobs:
     if: |
       (github.event_name == 'create' && github.event.ref_type != 'tag' && !startsWith(github.event.ref, 'v2'))
       ||
-      (github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-')
+      (github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-'))
     strategy:
       matrix:
         thread: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 ]
