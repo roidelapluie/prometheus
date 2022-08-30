@@ -52,43 +52,32 @@ jobs:
           $TestTargets = go list ./... | Where-Object { $_ -NotMatch "(github.com/prometheus/prometheus/discovery.*|github.com/prometheus/prometheus/config|github.com/prometheus/prometheus/web)"}
           go test $TestTargets -vet=off -v
         shell: powershell
-#    working_directory: /go/src/github.com/prometheus/prometheus
-#    steps:
-#      - checkout
-#      - run:
-#          # Temporary workaround until circleci updates go.
-#          command: |
-#            choco upgrade -y golang
-#      - run:
-#          command: refreshenv
-#      - run:
-#          command: |
-#            $TestTargets = go list ./... | Where-Object { $_ -NotMatch "(github.com/prometheus/prometheus/discovery.*|github.com/prometheus/prometheus/config|github.com/prometheus/prometheus/web)"}
-#            go test $TestTargets -vet=off -v
-#          environment:
-#            GOGC: "20"
-#            GOOPTS: "-p 2"
-#
-#  test_golang_oldest:
-#    executor: golang_oldest
-#    steps:
-#      - checkout
-#      - run: make build
-#      - run: go test ./tsdb/...
-#      - run: go test ./tsdb/ -test.tsdb-isolation=false
-#
-#  test_mixins:
-#    executor: golang
-#    steps:
-#      - checkout
-#      - run: go install ./cmd/promtool/.
-#      - run: go install github.com/google/go-jsonnet/cmd/jsonnet@latest
-#      - run: go install github.com/google/go-jsonnet/cmd/jsonnetfmt@latest
-#      - run: go install github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb@latest
-#      - run: make -C documentation/prometheus-mixin clean
-#      - run: make -C documentation/prometheus-mixin jb_install
-#      - run: make -C documentation/prometheus-mixin
-#      - run: git diff --exit-code
+
+  test_golang_oldest:
+    # The go verson in this image should be N-1 wrt test_go.
+    container:
+      image: quay.io/prometheus/golang-builder:1.17-base
+    steps:
+      - uses: actions/checkout@v3
+      - run: make build
+      - run: go test ./tsdb/...
+      - run: go test ./tsdb/ -test.tsdb-isolation=false
+
+  test_mixins:
+    # Whenever the Go version is updated here, .promu.yml
+    # should also be updated.
+    container:
+      image: quay.io/prometheus/golang-builder:1.18-base
+    steps:
+      - uses: actions/checkout@v3
+      - run: go install ./cmd/promtool/.
+      - run: go install github.com/google/go-jsonnet/cmd/jsonnet@latest
+      - run: go install github.com/google/go-jsonnet/cmd/jsonnetfmt@latest
+      - run: go install github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb@latest
+      - run: make -C documentation/prometheus-mixin clean
+      - run: make -C documentation/prometheus-mixin jb_install
+      - run: make -C documentation/prometheus-mixin
+      - run: git diff --exit-code
 #
 #  repo_sync:
 #    executor: golang
