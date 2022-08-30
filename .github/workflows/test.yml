@@ -80,56 +80,43 @@ jobs:
       - run: make -C documentation/prometheus-mixin jb_install
       - run: make -C documentation/prometheus-mixin
       - run: git diff --exit-code
-#
-#  repo_sync:
-#    executor: golang
-#    steps:
-#      - checkout
-#      - run: ./scripts/sync_repo_files.sh
-#
-#workflows:
-#  version: 2
-#  prometheus:
-#    jobs:
-#      - test_go:
-#          filters:
-#            tags:
-#              only: /.*/
-#      - test_ui:
-#          filters:
-#            tags:
-#              only: /.*/
-#      - test_golang_oldest:
-#          filters:
-#            tags:
-#              only: /.*/
-#      - test_mixins:
-#          filters:
-#            tags:
-#              only: /.*/
-#      - test_windows:
-#          filters:
-#            branches:
-#              only: /^(release-.*|.*build-all.*)$/
-#            tags:
-#              only: /^v2(\.[0-9]+){2}(-.+|[^-.]*)$/
-#      - prometheus/build:
-#          name: build
-#          parallelism: 3
-#          promu_opts: "-p linux/amd64 -p windows/amd64 -p linux/arm64 -p darwin/amd64 -p darwin/arm64 -p linux/386"
-#          filters:
-#            tags:
-#              ignore: /^v2(\.[0-9]+){2}(-.+|[^-.]*)$/
-#            branches:
-#              ignore: /^(main|release-.*|.*build-all.*)$/
-#      - prometheus/build:
-#          name: build_all
-#          parallelism: 12
-#          filters:
-#            branches:
-#              only: /^(main|release-.*|.*build-all.*)$/
-#            tags:
-#              only: /^v2(\.[0-9]+){2}(-.+|[^-.]*)$/
+
+  build:
+    runs-on: ubuntu-latest
+    if: |
+      !(github.event_name == 'create' && github.event.ref_type != 'tag' && !startsWith(github.event.ref, 'v2'))
+      &&
+      !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-')
+    strategy:
+      matrix:
+        thread: [ 0, 1, 2 ]
+    container:
+      image: quay.io/prometheus/golang-builder:1.18-base
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build
+        with:
+          promu_opts: "-p linux/amd64 -p windows/amd64 -p linux/arm64 -p darwin/amd64 -p darwin/arm64 -p linux/386"
+          parallelism: 3
+          thread: ${{ matrix.thread }}
+  build_all:
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'create' && github.event.ref_type != 'tag' && !startsWith(github.event.ref, 'v2'))
+      ||
+      (github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-')
+    strategy:
+      matrix:
+        thread: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 ]
+
+    # Whenever the Go version is updated here, .promu.yml
+    # should also be updated.
+    container:
+      image: quay.io/prometheus/golang-builder:1.18-base
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build
+        with:
+          parallelism: 12
+          thread: ${{ matrix.thread }}
 #      - prometheus/publish_main:
 #          context: org-context
 #          requires:
