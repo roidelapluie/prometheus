@@ -3,7 +3,6 @@ name: tests
 on:
   pull_request:
   push:
-  workflow_call:
 jobs:
   test_go:
     runs-on: ubuntu-latest
@@ -118,11 +117,13 @@ jobs:
           parallelism: 12
           thread: ${{ matrix.thread }}
 
-#  publish_main:
-#    runs-on: ubuntu-latest
-#    if: "github.event_name == 'push' && github.event.ref == 'main'"
-#      - uses: actions/checkout@v3
-#      - uses: ./.github/actions/publish_main
+  publish_main:
+    runs-on: ubuntu-latest
+    needs: [test_ui, test_go, test_windows, build]
+    if: "github.event_name == 'push' && github.event.ref == 'main'"
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/publish_main
 #      - prometheus/publish_main:
 #          context: org-context
 #          requires:
