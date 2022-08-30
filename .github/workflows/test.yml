@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     # Whenever the Go version is updated here, .promu.yml
     # should also be updated.
-    container:
+    container: &container
       image: quay.io/prometheus/golang-builder:1.18-base
     steps:
       - uses: actions/checkout@v3
@@ -19,27 +19,24 @@ jobs:
       - uses: ./.github/actions/check_proto
         with:
           version: "3.15.8"
-#
-#  test_ui:
-#    executor: golang
-#
-#    steps:
-#      - checkout
-#      - restore_cache:
-#          keys:
-#            - v3-npm-deps-{{ checksum "web/ui/package-lock.json" }}
-#            - v3-npm-deps-
-#      - run: make assets-tarball
-#      - run: make ui-lint
-#      - run: make ui-test
-#      - persist_to_workspace:
-#          root: .
-#          paths:
-#            - .tarballs
-#      - save_cache:
-#          key: v3-npm-deps-{{ checksum "web/ui/package-lock.json" }}
-#          paths:
-#            - ~/.npm
+
+  test_ui:
+    runs-on: ubuntu-latest
+    container: *container
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup_environment
+        with:
+          enable_go: false
+          enable_npm: true
+      - run: make assets-tarball
+      - run: make ui-lint
+      - run: make ui-test
+      - uses: actions/upload-artifact@v3
+        with:
+          path: |
+            .tarballs
 #
 #  test_windows:
 #    executor:
