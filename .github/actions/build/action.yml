@@ -16,5 +16,5 @@ runs:
   using: composite
   steps:
     - uses: ./.github/actions/setup_environment
-    - run: promu crossbuild -v --parallelism ${{ inputs.parallelism }} --parallelism-thread ${{ inputs.thread }} ${{ inputs.promu_opts }}
+    - run: ~/go/bin/promu crossbuild -v --parallelism ${{ inputs.parallelism }} --parallelism-thread ${{ inputs.thread }} ${{ inputs.promu_opts }}
       shell: bash
