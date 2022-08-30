@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     # Whenever the Go version is updated here, .promu.yml
     # should also be updated.
-    container: &container
+    container:
       image: quay.io/prometheus/golang-builder:1.18-base
     steps:
       - uses: actions/checkout@v3
@@ -22,7 +22,10 @@ jobs:
 
   test_ui:
     runs-on: ubuntu-latest
-    container: *container
+    # Whenever the Go version is updated here, .promu.yml
+    # should also be updated.
+    container:
+      image: quay.io/prometheus/golang-builder:1.18-base
 
     steps:
       - uses: actions/checkout@v3
