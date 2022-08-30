@@ -40,11 +40,23 @@ jobs:
         with:
           path: |
             .tarballs
-#
-#  test_windows:
-#    executor:
-#      name: win/default
-#      shell: powershell
+
+  test_windows:
+    runs-on: windows-latest
+    executor:
+      name: win/default
+      shell: powershell
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install go
+        run: choco upgrade -y golang
+        shell: powershell
+      - run: refreshenv
+        shell: powershell
+      - run: |
+          $TestTargets = go list ./... | Where-Object { $_ -NotMatch "(github.com/prometheus/prometheus/discovery.*|github.com/prometheus/prometheus/config|github.com/prometheus/prometheus/web)"}
+          go test $TestTargets -vet=off -v
+        shell: powershell
 #    working_directory: /go/src/github.com/prometheus/prometheus
 #    steps:
 #      - checkout
