@@ -90,8 +90,6 @@ jobs:
     strategy:
       matrix:
         thread: [ 0, 1, 2 ]
-    container:
-      image: quay.io/prometheus/golang-builder:1.18-base
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build
@@ -111,8 +109,6 @@ jobs:
 
     # Whenever the Go version is updated here, .promu.yml
     # should also be updated.
-    container:
-      image: quay.io/prometheus/golang-builder:1.18-base
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build
