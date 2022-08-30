@@ -54,6 +54,7 @@ jobs:
         shell: powershell
 
   test_golang_oldest:
+    runs-on: ubuntu-latest
     # The go verson in this image should be N-1 wrt test_go.
     container:
       image: quay.io/prometheus/golang-builder:1.17-base
@@ -64,6 +65,7 @@ jobs:
       - run: go test ./tsdb/ -test.tsdb-isolation=false
 
   test_mixins:
+    runs-on: ubuntu-latest
     # Whenever the Go version is updated here, .promu.yml
     # should also be updated.
     container:
