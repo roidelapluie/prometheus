@@ -1,7 +1,9 @@
 ---
+name: tests
 on:
   pull_request:
   push:
+  workflow_call:
 jobs:
   test_go:
     runs-on: ubuntu-latest
@@ -115,6 +117,12 @@ jobs:
         with:
           parallelism: 12
           thread: ${{ matrix.thread }}
+
+#  publish_main:
+#    runs-on: ubuntu-latest
+#    if: "github.event_name == 'push' && github.event.ref == 'main'"
+#      - uses: actions/checkout@v3
+#      - uses: ./.github/actions/publish_main
 #      - prometheus/publish_main:
 #          context: org-context
 #          requires:
@@ -137,14 +145,3 @@ jobs:
 #            branches:
 #              ignore: /.*/
 #          image: circleci/golang:1-node
-#  daily:
-#    triggers:
-#      - schedule:
-#          cron: "49 19 * * *"
-#          filters:
-#            branches:
-#              only:
-#                - main
-#    jobs:
-#      - repo_sync:
-#          context: org-context
