@@ -45,11 +45,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install go
-        run: choco upgrade -y golang
-        shell: powershell
-      - run: refreshenv
-        shell: powershell
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '^1.18'
       - run: |
           $TestTargets = go list ./... | Where-Object { $_ -NotMatch "(github.com/prometheus/prometheus/discovery.*|github.com/prometheus/prometheus/config|github.com/prometheus/prometheus/web)"}
           go test $TestTargets -vet=off -v
