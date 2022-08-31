@@ -41,6 +41,6 @@ runs:
         . /tmp/tmp-profile
         make docker DOCKER_REPO=${{ inputs.registry }}/${{ inputs.organization }}
         docker images
-        echo ${{ inputs.password }} | docker login -u ${{ inputs.login }} --password-stdin ${{ inputs..registry }}
+        echo ${{ inputs.password }} | docker login -u ${{ inputs.login }} --password-stdin ${{ inputs.registry }}
         make docker-publish DOCKER_REPO=${{ inputs.registry }}/${{ inputs.organization }}
         make docker-manifest DOCKER_REPO=${{ inputs.registry }}/${{ inputs.organization }}

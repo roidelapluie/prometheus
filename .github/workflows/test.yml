@@ -85,7 +85,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     if: |
-      !(github.event_name == 'create' && github.event.ref_type != 'tag' && !startsWith(github.event.ref, 'v2'))
+      !(github.event_name == 'create' && github.event.ref_type != 'tag' && !startsWith(github.event.ref, 'refs/tags/v2.'))
       &&
       !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-'))
       &&
@@ -103,7 +103,7 @@ jobs:
   build_all:
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'create' && github.event.ref_type != 'tag' && !startsWith(github.event.ref, 'v2'))
+      (github.event_name == 'create' && github.event.ref_type != 'tag' && !startsWith(github.event.ref, 'refs/tags/v2.'))
       ||
       (github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-'))
       ||
@@ -128,6 +128,20 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/publish_main
+        with:
+          docker_hub_organization: roidelapluie
+          docker_hub_login: ${{ secrets.docker_hub_login }}
+          docker_hub_password: ${{ secrets.docker_hub_password }}
+          quay_io_organization: roidelapluie
+          quay_io_login: ${{ secrets.quay_io_login }}
+          quay_io_password: ${{ secrets.quay_io_password }}
+  publish_release:
+    runs-on: ubuntu-latest
+    needs: [test_ui, test_go, test_windows, build_all]
+    if: github.event_name == 'create' && github.event.ref_type == 'tag' && startsWith(github.event.ref, 'refs/tags/v2.')
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/publish_release
         with:
           docker_hub_organization: roidelapluie
           docker_hub_login: ${{ secrets.docker_hub_login }}
