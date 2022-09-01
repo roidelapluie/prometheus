@@ -18,7 +18,7 @@ workflows:
   version: 2
   prometheus:
     jobs:
-      - noop
+      - noopjob
     triggers:
       - schedule:
           cron: "0 0 30 2 *"
