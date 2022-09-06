@@ -90,7 +90,7 @@ jobs:
     name: Build Prometheus for common architectures
     runs-on: ubuntu-latest
     if: |
-      !(github.event_name == 'push' && github.event.ref_type == 'tag' && startsWith(github.event.ref, 'refs/tags/v2.'))
+      !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
       &&
       !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-'))
       &&
@@ -109,7 +109,7 @@ jobs:
     name: Build Prometheus for all architectures
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'push' && github.event.ref_type == 'tag' && startsWith(github.event.ref, 'refs/tags/v2.'))
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v2.'))
       ||
       (github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'release-'))
       ||
@@ -144,7 +144,7 @@ jobs:
     name: Publish release arfefacts
     runs-on: ubuntu-latest
     needs: [test_ui, test_go, test_windows, build_all]
-    if: github.event_name == 'push' && github.event.ref_type == 'tag' && startsWith(github.event.ref, 'refs/tags/v2.')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v2.')
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/publish_release
@@ -172,17 +172,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
       - name: Check libraries version
-        if: github.event_name == 'push' && github.event.ref_type == 'tag' && startsWith(github.event.ref, 'refs/tags/v2.')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v2.')
         run: ./scripts/ui_release.sh --check-package "$(echo ${{ github.ref_name }}|sed s/v2/v0/)"
       - name: build
         run: make assets
       - name: Copy files before publishing libs
         run: ./scripts/ui_release.sh --copy
       - name: Publish dry-run libraries
-        if: "!(github.event_name == 'push' && github.event.ref_type == 'tag' && startsWith(github.event.ref, 'refs/tags/v2.'))"
+        if: "!(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v2.'))"
         run: ./scripts/ui_release.sh --publish dry-run
       - name: Publish libraries
-        if: github.event_name == 'push' && github.event.ref_type == 'tag' && startsWith(github.event.ref, 'refs/tags/v2.')
+        if: github.event_name == 'push' && && startsWith(github.ref, 'refs/tags/v2.')
         run: ./scripts/ui_release.sh --publish
         env:
           # The setup-node action writes an .npmrc file with this env variable
