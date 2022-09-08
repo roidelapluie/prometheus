@@ -9,8 +9,8 @@ runs:
   using: composite
   steps:
     - run: |
-        tar cf artifact.tar ${{ inputs.directory }}
-        mv artifact.tar artifact-$(sha1sum|awk '{ print $1 }').tar
+        tar cvf artifact.tar ${{ inputs.directory }}
+        mv artifact.tar artifact-$(sha1sum artifact.tar|awk '{ print $1 }').tar
       shell: bash
     - uses: actions/upload-artifact@v3
       with:
