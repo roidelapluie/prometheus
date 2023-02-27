@@ -1,4 +1,4 @@
-import React, { Fragment, FC } from 'react';
+import React, { Fragment, FC, useState, useEffect } from 'react';
 import { Table } from 'reactstrap';
 import { withStatusIndicator } from '../../components/withStatusIndicator';
 import { useFetch } from '../../hooks/useFetch';
@@ -98,6 +98,41 @@ const StatusResult: FC<{ fetchPath: string; title: string }> = ({ fetchPath, tit
 };
 
 const Status: FC<{ agentMode: boolean }> = ({ agentMode }) => {
+  /*    _
+   *   /' \
+   *  |    |
+   *   \__/ */
+
+  const [inputText, setInputText] = useState('');
+
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      const keyPressed = event.key.toUpperCase();
+      setInputText((prevInputText) => {
+        const newInputText = prevInputText.slice(-3) + String.fromCharCode(((keyPressed.charCodeAt(0) - 64) % 26) + 65);
+        return newInputText;
+      });
+    };
+
+    document.addEventListener('keypress', handleKeyPress);
+
+    return () => {
+      document.removeEventListener('keypress', handleKeyPress);
+    };
+  }, []);
+
+  useEffect(() => {
+    const flame = document.querySelector('#flame') as HTMLElement;
+    if (inputText.toUpperCase() === 'QSPN' && flame) {
+      flame.classList.add('animate');
+    }
+  }, [inputText]);
+
+  /*    _
+   *   /' \
+   *  |    |
+   *   \__/ */
+
   const pathPrefix = usePathPrefix();
   const path = `${pathPrefix}/${API_PATH}`;
 
