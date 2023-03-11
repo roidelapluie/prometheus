@@ -14,13 +14,16 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -432,4 +435,45 @@ func TestExitCodes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDocumentation(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "promtool.md")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, promtoolPath, "-test.main", "write-documentation", file)
+	if err := cmd.Run(); err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			if exitError.ExitCode() != 0 {
+				fmt.Println("Command failed with non-zero exit code")
+			}
+		}
+	}
+
+	finalPath := strings.TrimSuffix(filepath.Base(promtoolPath), ".test")
+	err := replaceStringInFile(file, filepath.Base(promtoolPath), finalPath)
+	require.NoError(t, err)
+
+	expectedContent, err := ioutil.ReadFile(filepath.Join("..", "..", "docs", "command-line", "promtool.md"))
+	require.NoError(t, err)
+
+	tempFileContent, err := ioutil.ReadFile(file)
+	require.NoError(t, err)
+
+	require.Equal(t, string(expectedContent), string(tempFileContent), "Generated content does not match documentation. Hint: run `make cli-documentation`.")
+}
+
+func replaceStringInFile(filename string, oldStr string, newStr string) error {
+	input, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	output := strings.ReplaceAll(string(input), oldStr, newStr)
+	err = os.WriteFile(filename, []byte(output), 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }
