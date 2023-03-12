@@ -6,9 +6,9 @@ Tooling for the Prometheus monitoring system.
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| -h, --help | Show context-sensitive help (also try --help-long and --help-man). |  |
-| --version | Show application version. |  |
-| --enable-feature | Comma separated feature names to enable (only PromQL related and no-default-scrape-port). See https://prometheus.io/docs/prometheus/latest/feature_flags/ for the options and more details. | `` |## Commands
+| `-h`, `--help` | Show context-sensitive help (also try --help-long and --help-man). |  |
+| `--version` | Show application version. |  |
+| `--enable-feature` | Comma separated feature names to enable (only PromQL related and no-default-scrape-port). See https://prometheus.io/docs/prometheus/latest/feature_flags/ for the options and more details. | `` |## Commands
 
 | Command | Description |
 | --- | --- |
@@ -37,7 +37,7 @@ Check the resources for validity.
 
 | Flag | Description |
 | --- | --- |
-| --extended | Print extended information related to the cardinality of the metrics. |
+| `--extended` | Print extended information related to the cardinality of the metrics. |
 
 ### `promtool check service-discovery`
 
@@ -47,7 +47,7 @@ Perform service discovery for the given job name and report the results, includi
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| --timeout | The time to wait for discovery results. | `30s` |### Arguments
+| `--timeout` | The time to wait for discovery results. | `30s` |### Arguments
 
 | Argument | Description | Required |
 | --- | --- | --- |
@@ -62,10 +62,10 @@ Check if the config files are valid or not.
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| --syntax-only | Only check the config file syntax, ignoring file and content validation referenced in the config |  |
-| --lint | Linting checks to apply to the rules specified in the config. Available options are: all, duplicate-rules, none. Use --lint=none to disable linting | `duplicate-rules` |
-| --lint-fatal | Make lint errors exit with exit code 3. | `false` |
-| --agent | Check config file for Prometheus in Agent mode. |  |### Arguments
+| `--syntax-only` | Only check the config file syntax, ignoring file and content validation referenced in the config |  |
+| `--lint` | Linting checks to apply to the rules specified in the config. Available options are: all, duplicate-rules, none. Use --lint=none to disable linting | `duplicate-rules` |
+| `--lint-fatal` | Make lint errors exit with exit code 3. | `false` |
+| `--agent` | Check config file for Prometheus in Agent mode. |  |### Arguments
 
 | Argument | Description | Required |
 | --- | --- | --- |
@@ -89,8 +89,8 @@ Check if the rule files are valid or not.
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| --lint | Linting checks to apply. Available options are: all, duplicate-rules, none. Use --lint=none to disable linting | `duplicate-rules` |
-| --lint-fatal | Make lint errors exit with exit code 3. | `false` |### Arguments
+| `--lint` | Linting checks to apply. Available options are: all, duplicate-rules, none. Use --lint=none to disable linting | `duplicate-rules` |
+| `--lint-fatal` | Make lint errors exit with exit code 3. | `false` |### Arguments
 
 | Argument | Description | Required |
 | --- | --- | --- |
@@ -116,8 +116,8 @@ Run query against a Prometheus server.
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| -o, --format | Output format of the query. | `promql` |
-| --http.config.file | HTTP client configuration file for promtool to connect to Prometheus. |  |
+| `-o`, `--format` | Output format of the query. | `promql` |
+| `--http.config.file` | HTTP client configuration file for promtool to connect to Prometheus. |  |
 
 ### `promtool query instant`
 
@@ -127,7 +127,7 @@ Run instant query.
 
 | Flag | Description |
 | --- | --- |
-| --time | Query evaluation time (RFC3339 or Unix timestamp). |### Arguments
+| `--time` | Query evaluation time (RFC3339 or Unix timestamp). |### Arguments
 
 | Argument | Description | Required |
 | --- | --- | --- |
@@ -142,10 +142,10 @@ Run range query.
 
 | Flag | Description |
 | --- | --- |
-| --header | Extra headers to send to server. |
-| --start | Query range start time (RFC3339 or Unix timestamp). |
-| --end | Query range end time (RFC3339 or Unix timestamp). |
-| --step | Query step size (duration). |### Arguments
+| `--header` | Extra headers to send to server. |
+| `--start` | Query range start time (RFC3339 or Unix timestamp). |
+| `--end` | Query range end time (RFC3339 or Unix timestamp). |
+| `--step` | Query step size (duration). |### Arguments
 
 | Argument | Description | Required |
 | --- | --- | --- |
@@ -160,9 +160,9 @@ Run series query.
 
 | Flag | Description |
 | --- | --- |
-| --match | Series selector. Can be specified multiple times. |
-| --start | Start time (RFC3339 or Unix timestamp). |
-| --end | End time (RFC3339 or Unix timestamp). |### Arguments
+| `--match` | Series selector. Can be specified multiple times. |
+| `--start` | Start time (RFC3339 or Unix timestamp). |
+| `--end` | End time (RFC3339 or Unix timestamp). |### Arguments
 
 | Argument | Description | Required |
 | --- | --- | --- |
@@ -176,9 +176,9 @@ Run labels query.
 
 | Flag | Description |
 | --- | --- |
-| --start | Start time (RFC3339 or Unix timestamp). |
-| --end | End time (RFC3339 or Unix timestamp). |
-| --match | Series selector. Can be specified multiple times. |### Arguments
+| `--start` | Start time (RFC3339 or Unix timestamp). |
+| `--end` | End time (RFC3339 or Unix timestamp). |
+| `--match` | Series selector. Can be specified multiple times. |### Arguments
 
 | Argument | Description | Required |
 | --- | --- | --- |
@@ -257,9 +257,9 @@ Run a write performance benchmark.
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| --out | Set the output path. | `benchout` |
-| --metrics | Number of metrics to read. | `10000` |
-| --scrapes | Number of scrapes to simulate. | `3000` |### Arguments
+| `--out` | Set the output path. | `benchout` |
+| `--metrics` | Number of metrics to read. | `10000` |
+| `--scrapes` | Number of scrapes to simulate. | `3000` |### Arguments
 
 | Argument | Description | Default |
 | --- | --- | --- |
@@ -273,8 +273,8 @@ Analyze churn, label pair cardinality and compaction efficiency.
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| --limit | How many items to show in each list. | `20` |
-| --extended | Run extended analysis. |  |### Arguments
+| `--limit` | How many items to show in each list. | `20` |
+| `--extended` | Run extended analysis. |  |### Arguments
 
 | Argument | Description | Default |
 | --- | --- | --- |
@@ -289,7 +289,7 @@ List tsdb blocks.
 
 | Flag | Description |
 | --- | --- |
-| -r, --human-readable | Print human readable values. |### Arguments
+| `-r`, `--human-readable` | Print human readable values. |### Arguments
 
 | Argument | Description | Default |
 | --- | --- | --- |
@@ -303,9 +303,9 @@ Dump samples from a TSDB.
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| --min-time | Minimum timestamp to dump. | `-9223372036854775808` |
-| --max-time | Maximum timestamp to dump. | `9223372036854775807` |
-| --match | Series selector. | `{__name__=~'(?s:.*)'}` |### Arguments
+| `--min-time` | Minimum timestamp to dump. | `-9223372036854775808` |
+| `--max-time` | Maximum timestamp to dump. | `9223372036854775807` |
+| `--match` | Series selector. | `{__name__=~'(?s:.*)'}` |### Arguments
 
 | Argument | Description | Default |
 | --- | --- | --- |
@@ -319,8 +319,8 @@ Dump samples from a TSDB.
 
 | Flag | Description |
 | --- | --- |
-| -r, --human-readable | Print human readable values. |
-| -q, --quiet | Do not print created blocks. |
+| `-r`, `--human-readable` | Print human readable values. |
+| `-q`, `--quiet` | Do not print created blocks. |
 
 ### `promtool tsdb create-blocks-from openmetrics`
 
@@ -341,12 +341,12 @@ Create blocks of data for new recording rules.
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| --http.config.file | HTTP client configuration file for promtool to connect to Prometheus. |  |
-| --url | The URL for the Prometheus API with the data where the rule will be backfilled from. | `http://localhost:9090` |
-| --start | The time to start backfilling the new rule from. Must be a RFC3339 formatted date or Unix timestamp. Required. |  |
-| --end | If an end time is provided, all recording rules in the rule files provided will be backfilled to the end time. Default will backfill up to 3 hours ago. Must be a RFC3339 formatted date or Unix timestamp. |  |
-| --output-dir | Output directory for generated blocks. | `data/` |
-| --eval-interval | How frequently to evaluate rules when backfilling if a value is not set in the recording rule files. | `60s` |### Arguments
+| `--http.config.file` | HTTP client configuration file for promtool to connect to Prometheus. |  |
+| `--url` | The URL for the Prometheus API with the data where the rule will be backfilled from. | `http://localhost:9090` |
+| `--start` | The time to start backfilling the new rule from. Must be a RFC3339 formatted date or Unix timestamp. Required. |  |
+| `--end` | If an end time is provided, all recording rules in the rule files provided will be backfilled to the end time. Default will backfill up to 3 hours ago. Must be a RFC3339 formatted date or Unix timestamp. |  |
+| `--output-dir` | Output directory for generated blocks. | `data/` |
+| `--eval-interval` | How frequently to evaluate rules when backfilling if a value is not set in the recording rule files. | `60s` |### Arguments
 
 | Argument | Description | Required |
 | --- | --- | --- |

@@ -104,9 +104,9 @@ func createFlagRow(flag *kingpin.FlagModel) []string {
 
 	var flagRow []string
 	if flag.Short == '\x00' {
-		flagRow = []string{fmt.Sprintf("--%s", flag.Name), flag.Help, defaultValue}
+		flagRow = []string{fmt.Sprintf("`--%s`", flag.Name), flag.Help, defaultValue}
 	} else {
-		flagRow = []string{fmt.Sprintf("-%c, --%s", flag.Short, flag.Name), flag.Help, defaultValue}
+		flagRow = []string{fmt.Sprintf("`-%c`, `--%s`", flag.Short, flag.Name), flag.Help, defaultValue}
 	}
 
 	return flagRow
