@@ -415,13 +415,13 @@ func main() {
 	promlogflag.AddFlags(a, &cfg.promlogConfig)
 
 	a.Flag("write-documentation", "Generate command line documentation. Internal use.").Hidden().Action(func(ctx *kingpin.ParseContext) error {
-		if err := documentcli.GenerateMarkdown(a.Model(), *ctx.Elements[0].Value); err != nil {
+		if err := documentcli.GenerateMarkdown(a.Model()); err != nil {
 			os.Exit(1)
 			return err
 		}
 		os.Exit(0)
 		return nil
-	}).String()
+	}).Bool()
 
 	_, err := a.Parse(os.Args[1:])
 	if err != nil {

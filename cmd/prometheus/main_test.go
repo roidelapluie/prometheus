@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"os/exec"
@@ -486,12 +485,14 @@ func TestModeSpecificFlags(t *testing.T) {
 }
 
 func TestDocumentation(t *testing.T) {
-	file := filepath.Join(t.TempDir(), "prometheus.md")
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, promPath, "-test.main", "--write-documentation", file)
+	cmd := exec.CommandContext(ctx, promPath, "-test.main", "--write-documentation")
+
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+
 	if err := cmd.Run(); err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
 			if exitError.ExitCode() != 0 {
@@ -500,28 +501,10 @@ func TestDocumentation(t *testing.T) {
 		}
 	}
 
-	finalPath := strings.TrimSuffix(filepath.Base(promPath), ".test")
-	err := replaceStringInFile(file, filepath.Base(promPath), finalPath)
+	generatedContent := strings.ReplaceAll(stdout.String(), filepath.Base(promPath), strings.TrimSuffix(filepath.Base(promPath), ".test"))
+
+	expectedContent, err := os.ReadFile(filepath.Join("..", "..", "docs", "command-line", "prometheus.md"))
 	require.NoError(t, err)
 
-	expectedContent, err := ioutil.ReadFile(filepath.Join("..", "..", "docs", "command-line", "prometheus.md"))
-	require.NoError(t, err)
-
-	tempFileContent, err := ioutil.ReadFile(file)
-	require.NoError(t, err)
-
-	require.Equal(t, string(expectedContent), string(tempFileContent), "Generated content does not match documentation. Hint: run `make cli-documentation`.")
-}
-
-func replaceStringInFile(filename string, oldStr string, newStr string) error {
-	input, err := os.ReadFile(filename)
-	if err != nil {
-		return err
-	}
-	output := strings.ReplaceAll(string(input), oldStr, newStr)
-	err = os.WriteFile(filename, []byte(output), 0644)
-	if err != nil {
-		return err
-	}
-	return nil
+	require.Equal(t, string(expectedContent), generatedContent, "Generated content does not match documentation. Hint: run `make cli-documentation`.")
 }

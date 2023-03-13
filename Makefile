@@ -136,5 +136,5 @@ bench_tsdb: $(PROMU)
 
 .PHONY: cli-documentation
 cli-documentation:
-	$(GO) run ./cmd/prometheus/ --write-documentation docs/command-line/prometheus.md
-	$(GO) run ./cmd/promtool/ write-documentation docs/command-line/promtool.md
+	$(GO) run ./cmd/prometheus/ --write-documentation > docs/command-line/prometheus.md
+	$(GO) run ./cmd/promtool/ write-documentation > docs/command-line/promtool.md

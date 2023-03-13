@@ -22,11 +22,8 @@ import (
 	"github.com/alecthomas/kingpin/v2"
 )
 
-func GenerateMarkdown(model *kingpin.ApplicationModel, filename string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
+func GenerateMarkdown(model *kingpin.ApplicationModel) error {
+	file := os.Stdout
 	defer file.Close()
 
 	if err := writeHeader(file, model); err != nil {
