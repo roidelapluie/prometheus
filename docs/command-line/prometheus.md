@@ -1,3 +1,8 @@
+---
+title: prometheus
+
+---
+
 # prometheus
 
 The Prometheus monitoring server

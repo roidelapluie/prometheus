@@ -1,3 +1,8 @@
+---
+title: promtool
+
+---
+
 # promtool
 
 Tooling for the Prometheus monitoring system.

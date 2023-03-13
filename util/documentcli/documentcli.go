@@ -86,7 +86,7 @@ func GenerateMarkdown(model *kingpin.ApplicationModel) error {
 }
 
 func writeHeader(file *os.File, model *kingpin.ApplicationModel) error {
-	header := fmt.Sprintf("# %s\n\n%s\n\n", model.Name, model.Help)
+	header := fmt.Sprintf("---\ntitle: %s\n\n---\n\n# %s\n\n%s\n\n", model.Name, model.Name, model.Help)
 	if _, err := file.WriteString(header); err != nil {
 		return err
 	}
