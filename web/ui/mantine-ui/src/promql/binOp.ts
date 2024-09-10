@@ -174,6 +174,10 @@ export const vectorElemBinop = (
       return { value: lhs, keep: lhs >= rhs };
     case binaryOperatorType.lte:
       return { value: lhs, keep: lhs <= rhs };
+    case binaryOperatorType.or:
+      return { value: lhs, keep: true };
+    case binaryOperatorType.and:
+      return { value: lhs, keep: true };
     case binaryOperatorType.atan2:
       return { value: Math.atan2(lhs, rhs), keep: true };
     default:
