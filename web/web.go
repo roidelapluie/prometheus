@@ -77,7 +77,7 @@ var newUIReactRouterPaths = []string{
 	"/config",
 	"/flags",
 	"/service-discovery",
-	"/alertmanager-discovery",
+	"/discovered-alertmanagers",
 	"/status",
 	"/targets",
 }
