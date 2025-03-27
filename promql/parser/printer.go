@@ -146,6 +146,14 @@ func (node *BinaryExpr) getMatchingStr() string {
 	return matching
 }
 
+func (node *DurationExpr) String() string {
+	return fmt.Sprintf("%s %s %s", node.LHS, node.Op, node.RHS)
+}
+
+func (node *DurationExpr) ShortString() string {
+	return fmt.Sprintf("%s", node.Op)
+}
+
 func (node *Call) String() string {
 	return fmt.Sprintf("%s(%s)", node.Func.Name, node.Args)
 }

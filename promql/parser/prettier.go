@@ -79,6 +79,10 @@ func (e *BinaryExpr) Pretty(level int) string {
 	return fmt.Sprintf("%s\n%s%s%s%s\n%s", e.LHS.Pretty(level+1), indent(level), e.Op, returnBool, matching, e.RHS.Pretty(level+1))
 }
 
+func (e *DurationExpr) Pretty(level int) string {
+	return fmt.Sprintf("%s %s %s", e.LHS.Pretty(0), e.Op, e.RHS.Pretty(0))
+}
+
 func (e *Call) Pretty(level int) string {
 	s := indent(level)
 	if !needsSplit(e) {
