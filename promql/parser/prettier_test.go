@@ -668,3 +668,36 @@ func TestUnaryPretty(t *testing.T) {
 		})
 	}
 }
+
+func TestDurationExprPretty(t *testing.T) {
+	maxCharactersPerLine = 10
+	inputs := []struct {
+		in, out string
+	}{
+		{
+			in: `rate(foo[2*1h])`,
+			out: `rate(
+  foo[2 * 1h]
+)`,
+		},
+		{
+			in: `rate(foo[2*1h])`,
+			out: `rate(
+  foo[2 * 1h]
+)`,
+		},
+		{
+			in: `rate(foo[-5m+35m])`,
+			out: `rate(
+  foo[-5m + 35m]
+)`,
+		},
+	}
+	for _, test := range inputs {
+		t.Run(test.in, func(t *testing.T) {
+			expr, err := ParseExpr(test.in)
+			require.NoError(t, err)
+			require.Equal(t, test.out, Prettify(expr))
+		})
+	}
+}

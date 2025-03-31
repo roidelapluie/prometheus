@@ -1360,6 +1360,8 @@ yydefault:
 			if numLit, ok := yyDollar[1].node.(*NumberLiteral); ok {
 				if numLit.Val <= 0 {
 					yylex.(*parser).addParseErrf(numLit.PositionRange(), "duration must be greater than 0")
+					yyVAL.node = &NumberLiteral{Val: 0} // Return 0 on error.
+					break
 				}
 				yyVAL.node = yyDollar[1].node
 				break
@@ -1950,8 +1952,9 @@ yydefault:
 				yylex.(*parser).addParseErr(yyDollar[1].item.PositionRange(), err)
 			}
 			yyVAL.node = &NumberLiteral{
-				Val:      dur.Seconds(),
-				PosRange: yyDollar[1].item.PositionRange(),
+				Val:              dur.Seconds(),
+				PosRange:         yyDollar[1].item.PositionRange(),
+				FormatAsDuration: true,
 			}
 		}
 	case 236:
@@ -2021,20 +2024,49 @@ yydefault:
 		{
 			yyVAL.strings = nil
 		}
-	case 250:
-		yyDollar = yyS[yypt-2 : yypt+1]
+	case 249:
+		yyDollar = yyS[yypt-1 : yypt+1]
 		{
-			nl, ok := yyDollar[2].node.(*NumberLiteral)
-			if !ok {
-				yylex.(*parser).addParseErrf(yyDollar[1].item.PositionRange(), "expected number literal in duration expression")
+			nl := yyDollar[1].node.(*NumberLiteral)
+			if nl.Val > 1<<63/1e9 || nl.Val < -(1<<63)/1e9 {
+				yylex.(*parser).addParseErrf(nl.PosRange, "duration out of range")
 				yyVAL.node = &NumberLiteral{Val: 0}
 				break
 			}
-			if yyDollar[1].item.Typ == SUB {
-				nl.Val *= -1
-			}
-			nl.PosRange.Start = yyDollar[1].item.Pos
 			yyVAL.node = nl
+		}
+	case 250:
+		yyDollar = yyS[yypt-2 : yypt+1]
+		{
+			switch expr := yyDollar[2].node.(type) {
+			case *NumberLiteral:
+				if yyDollar[1].item.Typ == SUB {
+					expr.Val *= -1
+				}
+				if expr.Val > 1<<63/1e9 || expr.Val < -(1<<63)/1e9 {
+					yylex.(*parser).addParseErrf(yyDollar[1].item.PositionRange(), "duration out of range")
+					yyVAL.node = &NumberLiteral{Val: 0}
+					break
+				}
+				expr.PosRange.Start = yyDollar[1].item.Pos
+				yyVAL.node = expr
+				break
+			case *DurationExpr:
+				if yyDollar[1].item.Typ == SUB {
+					yyVAL.node = &DurationExpr{
+						Op:       SUB,
+						RHS:      expr,
+						StartPos: yyDollar[1].item.Pos,
+					}
+					break
+				}
+				yyVAL.node = expr
+				break
+			default:
+				yylex.(*parser).addParseErrf(yyDollar[1].item.PositionRange(), "expected number literal or duration expression")
+				yyVAL.node = &NumberLiteral{Val: 0}
+				break
+			}
 		}
 	case 251:
 		yyDollar = yyS[yypt-3 : yypt+1]
@@ -2054,11 +2086,21 @@ yydefault:
 	case 254:
 		yyDollar = yyS[yypt-3 : yypt+1]
 		{
+			if nl, ok := yyDollar[3].node.(*NumberLiteral); ok && nl.Val == 0 {
+				yylex.(*parser).addParseErrf(yyDollar[2].item.PositionRange(), "division by zero")
+				yyVAL.node = &NumberLiteral{Val: 0}
+				break
+			}
 			yyVAL.node = &DurationExpr{Op: DIV, LHS: yyDollar[1].node.(Expr), RHS: yyDollar[3].node.(Expr)}
 		}
 	case 255:
 		yyDollar = yyS[yypt-3 : yypt+1]
 		{
+			if nl, ok := yyDollar[3].node.(*NumberLiteral); ok && nl.Val == 0 {
+				yylex.(*parser).addParseErrf(yyDollar[2].item.PositionRange(), "modulo by zero")
+				yyVAL.node = &NumberLiteral{Val: 0}
+				break
+			}
 			yyVAL.node = &DurationExpr{Op: MOD, LHS: yyDollar[1].node.(Expr), RHS: yyDollar[3].node.(Expr)}
 		}
 	case 256:
@@ -2069,6 +2111,11 @@ yydefault:
 	case 258:
 		yyDollar = yyS[yypt-3 : yypt+1]
 		{
+			if durationExpr, ok := yyDollar[2].node.(*DurationExpr); ok {
+				durationExpr.Wrapped = true
+				yyVAL.node = durationExpr
+				break
+			}
 			yyVAL.node = yyDollar[2].node
 		}
 	}

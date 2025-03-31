@@ -439,6 +439,8 @@ positive_duration_expr : duration_expr
                             if numLit, ok := $1.(*NumberLiteral); ok {
                                 if numLit.Val <= 0 {
                                     yylex.(*parser).addParseErrf(numLit.PositionRange(), "duration must be greater than 0")
+                                    $$ = &NumberLiteral{Val: 0} // Return 0 on error.
+                                    break
                                 }
                                 $$ = $1
                                 break
@@ -960,6 +962,7 @@ number_duration_literal  : NUMBER
                             $$ = &NumberLiteral{
 			            Val:      dur.Seconds(),
 			            PosRange: $1.PositionRange(),
+                                    FormatAsDuration: true,
                             }
                         }
                 ;
@@ -1032,19 +1035,46 @@ maybe_grouping_labels: /* empty */ { $$ = nil }
  */
 
 duration_expr   : number_duration_literal
-                | unary_op duration_expr %prec MUL
                         {
-                        nl, ok := $2.(*NumberLiteral)
-                        if !ok {
-                                yylex.(*parser).addParseErrf($1.PositionRange(), "expected number literal in duration expression")
+                        nl := $1.(*NumberLiteral)
+                        if nl.Val > 1<<63/1e9 || nl.Val < -(1<<63)/1e9 {
+                                yylex.(*parser).addParseErrf(nl.PosRange, "duration out of range")
                                 $$ = &NumberLiteral{Val: 0}
                                 break
                         }
-                        if $1.Typ == SUB {
-                                nl.Val *= -1
-                        }
-                        nl.PosRange.Start = $1.Pos
                         $$ = nl
+                        }
+                | unary_op duration_expr %prec MUL
+                        {
+                        switch expr := $2.(type) {
+                        case *NumberLiteral:
+                                if $1.Typ == SUB {
+                                        expr.Val *= -1
+                                }
+                                if expr.Val > 1<<63/1e9 || expr.Val < -(1<<63)/1e9 {
+                                        yylex.(*parser).addParseErrf($1.PositionRange(), "duration out of range")
+                                        $$ = &NumberLiteral{Val: 0}
+                                        break
+                                }
+                                expr.PosRange.Start = $1.Pos
+                                $$ = expr
+                                break
+                        case *DurationExpr:
+                                if $1.Typ == SUB {
+                                        $$ = &DurationExpr{
+                                                Op: SUB,
+                                                RHS: expr,
+                                                StartPos: $1.Pos,
+                                        }
+                                        break
+                                }
+                                $$ = expr
+                                break
+                        default:
+                                yylex.(*parser).addParseErrf($1.PositionRange(), "expected number literal or duration expression")
+                                $$ = &NumberLiteral{Val: 0}
+                                break
+                        }
                 }
                 | duration_expr ADD duration_expr
                         { $$ = &DurationExpr{Op: ADD, LHS: $1.(Expr), RHS: $3.(Expr)} }
@@ -1053,16 +1083,36 @@ duration_expr   : number_duration_literal
                 | duration_expr MUL duration_expr
                         { $$ = &DurationExpr{Op: MUL, LHS: $1.(Expr), RHS: $3.(Expr)} }
                 | duration_expr DIV duration_expr
-                        { $$ = &DurationExpr{Op: DIV, LHS: $1.(Expr), RHS: $3.(Expr)} }
+                        {
+                        if nl, ok := $3.(*NumberLiteral); ok && nl.Val == 0 {
+                                yylex.(*parser).addParseErrf($2.PositionRange(), "division by zero")
+                                $$ = &NumberLiteral{Val: 0}
+                                break
+                        }
+                        $$ = &DurationExpr{Op: DIV, LHS: $1.(Expr), RHS: $3.(Expr)}
+                        }
                 | duration_expr MOD duration_expr
-                        { $$ = &DurationExpr{Op: MOD, LHS: $1.(Expr), RHS: $3.(Expr)} }
+                        {
+                        if nl, ok := $3.(*NumberLiteral); ok && nl.Val == 0 {
+                                yylex.(*parser).addParseErrf($2.PositionRange(), "modulo by zero")
+                                $$ = &NumberLiteral{Val: 0}
+                                break
+                        }
+                        $$ = &DurationExpr{Op: MOD, LHS: $1.(Expr), RHS: $3.(Expr)}
+                        }
                 | duration_expr POW duration_expr
                         { $$ = &DurationExpr{Op: POW, LHS: $1.(Expr), RHS: $3.(Expr)} }
                 | paren_duration_expr
                 ;
-
 paren_duration_expr : LEFT_PAREN duration_expr RIGHT_PAREN
-                        { $$ = $2 }
+                        { 
+                            if durationExpr, ok := $2.(*DurationExpr); ok {
+                                durationExpr.Wrapped = true
+                                $$ = durationExpr
+                                break
+                            }
+                            $$ = $2 
+                        }
                 ;
 
 %%

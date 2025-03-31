@@ -476,7 +476,6 @@ func (ng *Engine) SetQueryLogger(l QueryLogger) {
 
 // NewInstantQuery returns an evaluation query for the given expression at the given time.
 func (ng *Engine) NewInstantQuery(ctx context.Context, q storage.Queryable, opts QueryOpts, qs string, ts time.Time) (Query, error) {
-	fmt.Println("NewInstantQuery", qs)
 	pExpr, qry := ng.newQuery(q, qs, opts, ts, ts, 0)
 	finishQueue, err := ng.queueActive(ctx, qry)
 	if err != nil {
@@ -490,9 +489,9 @@ func (ng *Engine) NewInstantQuery(ctx context.Context, q storage.Queryable, opts
 	if err := ng.validateOpts(expr); err != nil {
 		return nil, err
 	}
-	*pExpr = PreprocessExpr(expr, ts, ts)
+	*pExpr, err = PreprocessExpr(expr, ts, ts)
 
-	return qry, nil
+	return qry, err
 }
 
 // NewRangeQuery returns an evaluation query for the given time range and with
@@ -514,9 +513,9 @@ func (ng *Engine) NewRangeQuery(ctx context.Context, q storage.Queryable, opts Q
 	if expr.Type() != parser.ValueTypeVector && expr.Type() != parser.ValueTypeScalar {
 		return nil, fmt.Errorf("invalid expression type %q for range query, must be Scalar or instant Vector", parser.DocumentedType(expr.Type()))
 	}
-	*pExpr = PreprocessExpr(expr, start, end)
+	*pExpr, err = PreprocessExpr(expr, start, end)
 
-	return qry, nil
+	return qry, err
 }
 
 func (ng *Engine) newQuery(q storage.Queryable, qs string, opts QueryOpts, start, end time.Time, interval time.Duration) (*parser.Expr, *query) {
@@ -3593,21 +3592,27 @@ func unwrapStepInvariantExpr(e parser.Expr) parser.Expr {
 
 // PreprocessExpr wraps all possible step invariant parts of the given expression with
 // StepInvariantExpr. It also resolves the preprocessors.
-func PreprocessExpr(expr parser.Expr, start, end time.Time) parser.Expr {
+func PreprocessExpr(expr parser.Expr, start, end time.Time) (parser.Expr, error) {
 	detectHistogramStatsDecoding(expr)
 
-	preprocessDurationExpr(expr)
+	err := preprocessDurationExpr(expr)
+	if err != nil {
+		return nil, err
+	}
 
 	isStepInvariant := preprocessExprHelper(expr, start, end)
 	if isStepInvariant {
-		return newStepInvariantExpr(expr)
+		return newStepInvariantExpr(expr), nil
 	}
-	return expr
+	return expr, nil
 }
 
 func preprocessDurationExpr(expr parser.Expr) error {
 	calculatedDuration := func(expr parser.Expr, allowedNegative bool) (time.Duration, error) {
-		duration := preprocessDurationExprCalculation(expr)
+		duration, err := preprocessDurationExprCalculation(expr)
+		if err != nil {
+			return 0, err
+		}
 		if duration <= 0 && !allowedNegative {
 			return 0, fmt.Errorf("duration must be greater than 0")
 		}
@@ -3633,6 +3638,12 @@ func preprocessDurationExpr(expr parser.Expr) error {
 			}
 		}
 	case *parser.SubqueryExpr:
+		if n.OriginalOffsetExpr != nil {
+			n.OriginalOffset, err = calculatedDuration(n.OriginalOffsetExpr, true)
+			if err != nil {
+				return err
+			}
+		}
 		if n.StepExpr != nil {
 			n.Step, err = calculatedDuration(n.StepExpr, false)
 			if err != nil {
@@ -3663,45 +3674,62 @@ func preprocessDurationExpr(expr parser.Expr) error {
 		return preprocessDurationExpr(n.Expr)
 	case *parser.UnaryExpr:
 		return preprocessDurationExpr(n.Expr)
-	case *parser.NumberLiteral:
+	case *parser.NumberLiteral, *parser.StringLiteral:
 	default:
 		panic(fmt.Sprintf("found unexpected duration expression type %T", n))
 	}
 	return nil
 }
 
-func preprocessDurationExprCalculation(expr parser.Expr) float64 {
+func preprocessDurationExprCalculation(expr parser.Expr) (float64, error) {
 	if n, ok := expr.(*parser.NumberLiteral); ok {
-		return n.Val
+		return n.Val, nil
 	}
 	var lhs, rhs float64
+	var err error
 	durationExpr := expr.(*parser.DurationExpr)
 	switch n := durationExpr.LHS.(type) {
 	case *parser.NumberLiteral:
 		lhs = n.Val
 	case *parser.DurationExpr:
-		lhs = preprocessDurationExprCalculation(n)
+		lhs, err = preprocessDurationExprCalculation(n)
+		if err != nil {
+			return 0, err
+		}
 	}
 	switch n := durationExpr.RHS.(type) {
 	case *parser.NumberLiteral:
 		rhs = n.Val
 	case *parser.DurationExpr:
-		rhs = preprocessDurationExprCalculation(n)
+		rhs, err = preprocessDurationExprCalculation(n)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	switch durationExpr.Op {
 	case parser.ADD:
-		return lhs + rhs
+		return lhs + rhs, nil
 	case parser.SUB:
-		return lhs - rhs
+		if durationExpr.LHS == nil {
+			// This is a unary negative duration expression.
+			return -rhs, nil
+		}
+		return lhs - rhs, nil
 	case parser.MUL:
-		return lhs * rhs
+		return lhs * rhs, nil
 	case parser.DIV:
-		return lhs / rhs
+		if rhs == 0 {
+			return 0, fmt.Errorf("division by zero")
+		}
+		return lhs / rhs, nil
 	case parser.MOD:
-		return float64(int64(lhs) % int64(rhs))
+		if rhs == 0 {
+			return 0, fmt.Errorf("modulo by zero")
+		}
+		return math.Mod(lhs, rhs), nil
 	case parser.POW:
-		return math.Pow(lhs, rhs)
+		return math.Pow(lhs, rhs), nil
 	default:
 		panic(fmt.Sprintf("found unexpected duration expression operator %q", durationExpr.Op))
 	}
@@ -3712,7 +3740,6 @@ func preprocessDurationExprCalculation(expr parser.Expr) float64 {
 // passed expression qualifies to be wrapped by StepInvariantExpr.
 // It also resolves the preprocessors.
 func preprocessExprHelper(expr parser.Expr, start, end time.Time) bool {
-	fmt.Println("preprocessExprHelper", expr)
 	switch n := expr.(type) {
 	case *parser.VectorSelector:
 		if n.OriginalOffsetExpr != nil {
@@ -3766,11 +3793,9 @@ func preprocessExprHelper(expr parser.Expr, start, end time.Time) bool {
 		return false
 
 	case *parser.MatrixSelector:
-		fmt.Println("MatrixSelector", n.RangeExpr)
 		if n.RangeExpr != nil {
 			preprocessDurationExpr(n)
 		}
-		fmt.Println("MatrixSelector", n.Range)
 		return preprocessExprHelper(n.VectorSelector, start, end)
 
 	case *parser.SubqueryExpr:

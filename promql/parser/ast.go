@@ -115,6 +115,9 @@ type BinaryExpr struct {
 type DurationExpr struct {
 	Op       ItemType // The operation of the expression.
 	LHS, RHS Expr     // The operands on the respective sides of the operator.
+	Wrapped  bool     // Set when the duration is wrapped in parentheses.
+
+	StartPos posrange.Pos // For unary operations, the position of the operator.
 }
 
 // Call represents a function call.
@@ -160,7 +163,8 @@ type SubqueryExpr struct {
 type NumberLiteral struct {
 	Val float64
 
-	PosRange posrange.PositionRange
+	FormatAsDuration bool // Used in DurationExpr to format the number as a duration.
+	PosRange         posrange.PositionRange
 }
 
 // ParenExpr wraps an expression so it cannot be disassembled as a consequence
@@ -453,8 +457,11 @@ func (e *BinaryExpr) PositionRange() posrange.PositionRange {
 }
 
 func (e *DurationExpr) PositionRange() posrange.PositionRange {
-	if e.RHS == nil {
-		return e.LHS.PositionRange()
+	if e.LHS == nil {
+		return posrange.PositionRange{
+			Start: e.StartPos,
+			End:   e.RHS.PositionRange().End,
+		}
 	}
 	return mergeRanges(e.LHS, e.RHS)
 }

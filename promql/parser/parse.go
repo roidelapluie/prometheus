@@ -979,13 +979,13 @@ func (p *parser) addOffset(e Node, offset time.Duration) {
 // addOffsetExpr is used to set the offset expression in the generated parser.
 func (p *parser) addOffsetExpr(e Node, expr *DurationExpr) {
 	var orgoffsetp *time.Duration
-	var orgoffsetexprp *DurationExpr
+	var orgoffsetexprp **DurationExpr
 	var endPosp *posrange.Pos
 
 	switch s := e.(type) {
 	case *VectorSelector:
 		orgoffsetp = &s.OriginalOffset
-		orgoffsetexprp = s.OriginalOffsetExpr
+		orgoffsetexprp = &s.OriginalOffsetExpr
 		endPosp = &s.PosRange.End
 	case *MatrixSelector:
 		vs, ok := s.VectorSelector.(*VectorSelector)
@@ -994,11 +994,11 @@ func (p *parser) addOffsetExpr(e Node, expr *DurationExpr) {
 			return
 		}
 		orgoffsetp = &vs.OriginalOffset
-		orgoffsetexprp = vs.OriginalOffsetExpr
+		orgoffsetexprp = &vs.OriginalOffsetExpr
 		endPosp = &s.EndPos
 	case *SubqueryExpr:
 		orgoffsetp = &s.OriginalOffset
-		orgoffsetexprp = s.OriginalOffsetExpr
+		orgoffsetexprp = &s.OriginalOffsetExpr
 		endPosp = &s.EndPos
 	default:
 		p.addParseErrf(e.PositionRange(), "offset modifier must be preceded by an instant vector selector or range vector selector or a subquery")
@@ -1006,11 +1006,10 @@ func (p *parser) addOffsetExpr(e Node, expr *DurationExpr) {
 	}
 
 	switch {
-	case *orgoffsetp != 0 || orgoffsetexprp != nil:
+	case *orgoffsetp != 0 || *orgoffsetexprp != nil:
 		p.addParseErrf(e.PositionRange(), "offset may not be set multiple times")
 	case orgoffsetexprp != nil:
-		s := e.(*VectorSelector)
-		s.OriginalOffsetExpr = expr
+		*orgoffsetexprp = expr
 	}
 
 	*endPosp = p.lastClosing
@@ -1103,72 +1102,4 @@ func MustGetFunction(name string) *Function {
 		panic(fmt.Errorf("function %q does not exist", name))
 	}
 	return f
-}
-
-// evalDurationExprBinOp evaluates binary operations for duration expressions.
-// It handles type checking, performs the operation using the specified operator,
-// and constructs a new NumberLiteral with the result.
-func (p *parser) evalDurationExprBinOp(lhs, rhs Node, op Item) *NumberLiteral {
-	if !ExperimentalDurationExpr {
-		p.addParseErrf(op.PositionRange(), "experimental duration expression parsing is experimental and must be enabled with --enable-feature=promql-duration-expr")
-		return &NumberLiteral{Val: 0}
-	}
-
-	numLit1, ok1 := lhs.(*NumberLiteral)
-	numLit2, ok2 := rhs.(*NumberLiteral)
-
-	if !ok1 || !ok2 {
-		p.addParseErrf(posrange.PositionRange{
-			Start: lhs.PositionRange().Start,
-			End:   rhs.PositionRange().End,
-		}, "invalid operands for %s", op.Val)
-		return &NumberLiteral{Val: 0}
-	}
-
-	var val float64
-	var err error
-
-	switch op.Typ {
-	case ADD:
-		val = numLit1.Val + numLit2.Val
-	case SUB:
-		val = numLit1.Val - numLit2.Val
-	case MUL:
-		val = numLit1.Val * numLit2.Val
-	case DIV:
-		if numLit2.Val == 0 {
-			err = errors.New("division by zero")
-		} else {
-			val = numLit1.Val / numLit2.Val
-		}
-	case MOD:
-		if numLit2.Val == 0 {
-			err = errors.New("modulo by zero")
-		} else {
-			val = math.Mod(numLit1.Val, numLit2.Val)
-		}
-	case POW:
-		val = math.Pow(numLit1.Val, numLit2.Val)
-	default:
-		p.addParseErrf(op.PositionRange(), "unknown operator for duration expression: %s", op.Val)
-		return &NumberLiteral{Val: 0}
-	}
-
-	if err != nil {
-		p.addParseErrf(numLit2.PosRange, err.Error())
-		return &NumberLiteral{Val: 0}
-	}
-
-	if val > 1<<63/1e9 || val < -(1<<63)/1e9 {
-		p.addParseErrf(op.PositionRange(), "duration out of range")
-		return &NumberLiteral{Val: 0}
-	}
-
-	return &NumberLiteral{
-		Val: val,
-		PosRange: posrange.PositionRange{
-			Start: numLit1.PosRange.Start,
-			End:   numLit2.PosRange.End,
-		},
-	}
 }
