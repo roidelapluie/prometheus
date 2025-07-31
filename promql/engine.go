@@ -1529,7 +1529,7 @@ func (ev *evaluator) rangeEvalAgg(ctx context.Context, aggExpr *parser.Aggregate
 	return result, annos
 }
 
-func (ev *evaluator) smoothSeries(series []storage.Series, offset time.Duration, recordOrigT bool) Matrix {
+func (ev *evaluator) smoothSeries(series []storage.Series, offset time.Duration) Matrix {
 	dur := ev.endTimestamp - ev.startTimestamp
 	it := storage.NewBuffer(dur + 2*durationMilliseconds(ev.lookbackDelta))
 	var chkIter chunkenc.Iterator
@@ -1543,7 +1543,7 @@ func (ev *evaluator) smoothSeries(series []storage.Series, offset time.Duration,
 
 		var floats []FPoint
 
-		for ts, step := ev.startTimestamp, -1; ts <= ev.endTimestamp; ts += ev.interval {
+		for ts, step := ev.startTimestamp-offset.Milliseconds(), -1; ts <= ev.endTimestamp-offset.Milliseconds(); ts += ev.interval {
 			matrixStart := ts - durationMilliseconds(ev.lookbackDelta)
 			matrixEnd := ts + durationMilliseconds(ev.lookbackDelta)
 			floats, _ = ev.matrixIterSlice(it, matrixStart, matrixEnd, floats, nil)
@@ -1904,6 +1904,7 @@ func (ev *evaluator) eval(ctx context.Context, expr parser.Expr) (parser.Value, 
 		// metric name in the output.
 		dropName := e.Func.Name != "last_over_time"
 		vectorVals := make([]Vector, len(e.Args)-1)
+		outSmoothFloats := make([]FPoint, 0)
 		for i, s := range selVS.Series {
 			if err := contextDone(ctx, "expression evaluation"); err != nil {
 				ev.error(err)
@@ -1963,7 +1964,7 @@ func (ev *evaluator) eval(ctx context.Context, expr parser.Expr) (parser.Value, 
 					inMatrix[0].Floats = anchorFloats(floats, mint, maxt)
 				case selVS.Smoothed:
 					counterReset := e.Func.Name == "rate" || e.Func.Name == "increase" || e.Func.Name == "irate"
-					inMatrix[0].Floats = smoothFloats(floats, mint, maxt, counterReset)
+					inMatrix[0].Floats = smoothFloats(floats, outSmoothFloats, mint, maxt, counterReset)
 				default:
 					inMatrix[0].Floats = floats
 				}
@@ -2165,7 +2166,7 @@ func (ev *evaluator) eval(ctx context.Context, expr parser.Expr) (parser.Value, 
 			ev.error(errWithWarnings{fmt.Errorf("expanding series: %w", err), ws})
 		}
 		if e.Smoothed {
-			mat := ev.smoothSeries(e.Series, e.Offset, false)
+			mat := ev.smoothSeries(e.Series, e.Offset)
 			return mat, ws
 		}
 		mat := ev.evalSeries(ctx, e.Series, e.Offset, false)
@@ -2491,6 +2492,7 @@ func (ev *evaluator) matrixSelector(ctx context.Context, node *parser.MatrixSele
 
 	var chkIter chunkenc.Iterator
 	series := vs.Series
+	outSmoothFloats := make([]FPoint, 0)
 	for i, s := range series {
 		if err := contextDone(ctx, "expression evaluation"); err != nil {
 			ev.error(err)
@@ -2506,7 +2508,7 @@ func (ev *evaluator) matrixSelector(ctx context.Context, node *parser.MatrixSele
 		case vs.Anchored:
 			ss.Floats = anchorFloats(ss.Floats, matrixMint, matrixMaxt)
 		case vs.Smoothed:
-			ss.Floats = smoothFloats(ss.Floats, matrixMint, matrixMaxt, false)
+			ss.Floats = smoothFloats(ss.Floats, outSmoothFloats, matrixMint, matrixMaxt, false)
 		}
 		totalSize := int64(len(ss.Floats)) + int64(totalHPointSize(ss.Histograms))
 		ev.samplesStats.IncrementSamplesAtTimestamp(ev.startTimestamp, totalSize)
@@ -4169,8 +4171,8 @@ func linear(f1, f2 float64, t1, t2, t int64) float64 {
 	return (1.0-ratio)*f1 + ratio*f2
 }
 
-func smoothFloats(floats []FPoint, mint, maxt int64, counterReset bool) []FPoint {
-	var out []FPoint
+func smoothFloats(floats []FPoint, out []FPoint, mint, maxt int64, counterReset bool) []FPoint {
+	out = out[:0]
 	n := len(floats)
 	if n == 0 {
 		return out
@@ -4206,12 +4208,13 @@ func smoothFloats(floats []FPoint, mint, maxt int64, counterReset bool) []FPoint
 	}
 
 	// Add interpolated/anchored point at maxt.
-	if i == n {
+	switch {
+	case i == n:
 		// If last point is before maxt, anchor at last value.
 		out = append(out, FPoint{T: maxt, F: floats[n-1].F})
-	} else if floats[i].T == maxt {
+	case floats[i].T == maxt:
 		out = append(out, floats[i])
-	} else if i > 0 {
+	case i > 0:
 		prev, next := floats[i-1], floats[i]
 		prevF := prev.F
 		if counterReset && prevF > next.F {
