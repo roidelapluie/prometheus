@@ -4164,9 +4164,6 @@ func anchorFloats(floats []FPoint, mint, maxt int64) []FPoint {
 
 // linear interpolates between two points at a given time.
 func linear(f1, f2 float64, t1, t2, t int64) float64 {
-	if f1 == f2 {
-		return f1
-	}
 	ratio := float64(t-t1) / float64(t2-t1)
 	return (1.0-ratio)*f1 + ratio*f2
 }
@@ -4179,10 +4176,9 @@ func smoothFloats(floats []FPoint, out []FPoint, mint, maxt int64, counterReset 
 	}
 
 	// Find first point after mint.
-	i := 0
-	for i < n && floats[i].T <= mint {
-		i++
-	}
+	i := sort.Search(n, func(j int) bool {
+		return floats[j].T > mint
+	})
 
 	// If all points are before mint or first after maxt, nothing to do.
 	if i == n {
