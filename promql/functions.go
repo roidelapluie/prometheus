@@ -65,6 +65,61 @@ func funcTime(_ []Vector, _ Matrix, _ parser.Expressions, enh *EvalNodeHelper) (
 	}}, nil
 }
 
+func extendedRate(vals Matrix, args parser.Expressions, enh *EvalNodeHelper, isCounter, isRate bool) (Vector, annotations.Annotations) {
+	ms := args[0].(*parser.MatrixSelector)
+	vs := ms.VectorSelector.(*parser.VectorSelector)
+
+	var (
+		samples            = vals[0]
+		numSamplesMinusOne = len(samples.Floats) - 1
+		rangeStart         = enh.Ts - durationMilliseconds(ms.Range+vs.Offset)
+		rangeEnd           = enh.Ts - durationMilliseconds(vs.Offset)
+		resultFloat        float64
+		annos              annotations.Annotations
+		firstSampleIndex   int
+		lastSampleIndex    = numSamplesMinusOne
+		smoothed           = vs.Smoothed
+	)
+
+	// Histograms are not implemented yet.
+	metricName := samples.Metric.Get(labels.MetricName)
+	if len(samples.Histograms) > 0 && len(samples.Floats) > 0 {
+		return enh.Out, annos.Add(annotations.NewUnsupportedHistogramRateWarning(metricName, args[0].PositionRange()))
+	}
+
+	for i, sample := range samples.Floats {
+		if sample.T <= rangeStart {
+			firstSampleIndex = i
+			continue
+		}
+		if !smoothed {
+			break
+		}
+		if sample.T >= rangeEnd {
+			lastSampleIndex = i
+			break
+		}
+	}
+
+	resultFloat = samples.Floats[lastSampleIndex].F - samples.Floats[firstSampleIndex].F
+	if isCounter {
+		// Handle counter resets:
+		prevValue := samples.Floats[0].F
+		for _, currPoint := range samples.Floats[1:] {
+			if currPoint.F < prevValue {
+				resultFloat += prevValue
+			}
+			prevValue = currPoint.F
+		}
+	}
+
+	if isRate {
+		resultFloat /= ms.Range.Seconds()
+	}
+
+	return append(enh.Out, Sample{F: resultFloat}), annos
+}
+
 // extrapolatedRate is a utility function for rate/increase/delta.
 // It calculates the rate (allowing for counter resets if isCounter is true),
 // extrapolates if the first/last sample is close to the boundary, and returns
@@ -72,6 +127,10 @@ func funcTime(_ []Vector, _ Matrix, _ parser.Expressions, enh *EvalNodeHelper) (
 func extrapolatedRate(vals Matrix, args parser.Expressions, enh *EvalNodeHelper, isCounter, isRate bool) (Vector, annotations.Annotations) {
 	ms := args[0].(*parser.MatrixSelector)
 	vs := ms.VectorSelector.(*parser.VectorSelector)
+	if vs.Anchored || vs.Smoothed {
+		return extendedRate(vals, args, enh, isCounter, isRate)
+	}
+
 	var (
 		samples            = vals[0]
 		rangeStart         = enh.Ts - durationMilliseconds(ms.Range+vs.Offset)

@@ -1904,7 +1904,6 @@ func (ev *evaluator) eval(ctx context.Context, expr parser.Expr) (parser.Value, 
 		// metric name in the output.
 		dropName := e.Func.Name != "last_over_time"
 		vectorVals := make([]Vector, len(e.Args)-1)
-		outSmoothFloats := make([]FPoint, 0)
 		for i, s := range selVS.Series {
 			if err := contextDone(ctx, "expression evaluation"); err != nil {
 				ev.error(err)
@@ -1959,15 +1958,7 @@ func (ev *evaluator) eval(ctx context.Context, expr parser.Expr) (parser.Value, 
 				if len(floats)+len(histograms) == 0 {
 					continue
 				}
-				switch {
-				case selVS.Anchored:
-					inMatrix[0].Floats = anchorFloats(floats, mint, maxt)
-				case selVS.Smoothed:
-					counterReset := e.Func.Name == "rate" || e.Func.Name == "increase" || e.Func.Name == "irate"
-					inMatrix[0].Floats = smoothFloats(floats, outSmoothFloats, mint, maxt, counterReset)
-				default:
-					inMatrix[0].Floats = floats
-				}
+				inMatrix[0].Floats = floats
 				inMatrix[0].Histograms = histograms
 				enh.Ts = ts
 

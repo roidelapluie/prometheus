@@ -205,6 +205,11 @@ eval instant at 6m increase(metric[5m])
     {id="2"} 10
     {id="3"} 15
 
+eval instant at 6m15s increase(metric[5m] smoothed)
+    {id="1"} 5
+    {id="2"} 10
+    {id="3"} 15
+    
 eval instant at 6m increase(metric[5m] smoothed)
     {id="1"} 5
     {id="2"} 10
