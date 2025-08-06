@@ -120,6 +120,7 @@ func RunBuiltinTestsWithStorage(t TBRun, engine promql.QueryEngine, newStorage f
 	t.Cleanup(func() {
 		parser.EnableExperimentalFunctions = false
 		parser.ExperimentalDurationExpr = false
+		parser.EnableExtendedRangeSelectors = false
 	})
 	parser.EnableExperimentalFunctions = true
 	parser.ExperimentalDurationExpr = true

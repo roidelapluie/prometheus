@@ -68,9 +68,15 @@ func funcTime(_ []Vector, _ Matrix, _ parser.Expressions, enh *EvalNodeHelper) (
 func extendedRate(vals Matrix, args parser.Expressions, enh *EvalNodeHelper, isCounter, isRate bool) (Vector, annotations.Annotations) {
 	ms := args[0].(*parser.MatrixSelector)
 	vs := ms.VectorSelector.(*parser.VectorSelector)
+	samples := vals[0]
+
+	// Histograms are not implemented yet.
+	metricName := samples.Metric.Get(labels.MetricName)
+	if len(samples.Histograms) > 0 {
+		return enh.Out, annos.Add(annotations.NewUnsupportedHistogramRateWarning(metricName, args[0].PositionRange()))
+	}
 
 	var (
-		samples            = vals[0]
 		numSamplesMinusOne = len(samples.Floats) - 1
 		rangeStart         = enh.Ts - durationMilliseconds(ms.Range+vs.Offset)
 		rangeEnd           = enh.Ts - durationMilliseconds(vs.Offset)
@@ -81,35 +87,67 @@ func extendedRate(vals Matrix, args parser.Expressions, enh *EvalNodeHelper, isC
 		smoothed           = vs.Smoothed
 	)
 
-	// Histograms are not implemented yet.
-	metricName := samples.Metric.Get(labels.MetricName)
-	if len(samples.Histograms) > 0 && len(samples.Floats) > 0 {
-		return enh.Out, annos.Add(annotations.NewUnsupportedHistogramRateWarning(metricName, args[0].PositionRange()))
+	firstSampleIndex = sort.Search(len(samples.Floats), func(i int) bool { return samples.Floats[i].T > rangeStart })
+	if firstSampleIndex > 0 {
+		firstSampleIndex = firstSampleIndex - 1
+	}
+	if smoothed {
+		lastSampleIndex = sort.Search(len(samples.Floats), func(i int) bool { return samples.Floats[i].T >= rangeEnd })
 	}
 
-	for i, sample := range samples.Floats {
-		if sample.T <= rangeStart {
-			firstSampleIndex = i
-			continue
-		}
-		if !smoothed {
-			break
-		}
-		if sample.T >= rangeEnd {
-			lastSampleIndex = i
-			break
-		}
+	if !smoothed && samples.Floats[lastSampleIndex].T <= rangeStart {
+		// Anchored is right closed.
+		return enh.Out, annos
 	}
 
-	resultFloat = samples.Floats[lastSampleIndex].F - samples.Floats[firstSampleIndex].F
-	if isCounter {
-		// Handle counter resets:
-		prevValue := samples.Floats[0].F
-		for _, currPoint := range samples.Floats[1:] {
-			if currPoint.F < prevValue {
+	if firstSampleIndex == numSamplesMinusOne && samples.Floats[firstSampleIndex].T <= rangeStart {
+		return enh.Out, annos
+	}
+
+	if smoothed {
+		var firstSampleFloat, lastSampleFloat float64
+		if samples.Floats[firstSampleIndex].T >= rangeStart {
+			firstSampleFloat = samples.Floats[firstSampleIndex].F
+		} else {
+			firstSampleFloat = linear(samples.Floats[firstSampleIndex].F, samples.Floats[firstSampleIndex+1].F, samples.Floats[firstSampleIndex].T, samples.Floats[firstSampleIndex+1].T, rangeStart, isCounter)
+		}
+
+		if samples.Floats[lastSampleIndex].T <= rangeEnd {
+			lastSampleFloat = samples.Floats[lastSampleIndex].F
+		} else if lastSampleIndex > 0 {
+			lastSampleFloat = linear(samples.Floats[lastSampleIndex-1].F, samples.Floats[lastSampleIndex].F, samples.Floats[lastSampleIndex-1].T, samples.Floats[lastSampleIndex].T, rangeEnd, isCounter)
+		} else {
+			return enh.Out, annos
+		}
+
+		resultFloat = lastSampleFloat - firstSampleFloat
+		if isCounter {
+			// Handle counter resets:
+			prevValue := firstSampleFloat
+			for _, currPoint := range samples.Floats[firstSampleIndex+1:] {
+				if currPoint.T >= rangeEnd {
+					break
+				}
+				if currPoint.F < prevValue {
+					resultFloat += prevValue
+				}
+				prevValue = currPoint.F
+			}
+			if lastSampleFloat < prevValue {
 				resultFloat += prevValue
 			}
-			prevValue = currPoint.F
+		}
+	} else {
+		resultFloat = samples.Floats[lastSampleIndex].F - samples.Floats[firstSampleIndex].F
+		if isCounter {
+			// Handle counter resets:
+			prevValue := samples.Floats[firstSampleIndex].F
+			for _, currPoint := range samples.Floats[firstSampleIndex+1:] {
+				if currPoint.F < prevValue {
+					resultFloat += prevValue
+				}
+				prevValue = currPoint.F
+			}
 		}
 	}
 

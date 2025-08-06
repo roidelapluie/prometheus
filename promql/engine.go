@@ -1565,7 +1565,7 @@ func (ev *evaluator) smoothSeries(series []storage.Series, offset time.Duration)
 					continue
 				}
 				if havePrev {
-					value := linear(prevF, f.F, prevT, f.T, ts)
+					value := linear(prevF, f.F, prevT, f.T, ts, false)
 					ss.Floats = append(ss.Floats, FPoint{F: value, T: ts})
 					found = true
 					break
@@ -4154,8 +4154,14 @@ func anchorFloats(floats []FPoint, mint, maxt int64) []FPoint {
 }
 
 // linear interpolates between two points at a given time.
-func linear(f1, f2 float64, t1, t2, t int64) float64 {
+func linear(f1, f2 float64, t1, t2, t int64, isRate bool) float64 {
 	ratio := float64(t-t1) / float64(t2-t1)
+	if t1 == t {
+		return f1
+	}
+	if isRate && f1 > f2 {
+		return ratio * f2
+	}
 	return (1.0-ratio)*f1 + ratio*f2
 }
 
@@ -4182,10 +4188,7 @@ func smoothFloats(floats []FPoint, out []FPoint, mint, maxt int64, counterReset 
 	} else {
 		prev, next := floats[i-1], floats[i]
 		prevF := prev.F
-		if counterReset && prevF > next.F {
-			prevF = 0
-		}
-		f := linear(prevF, next.F, prev.T, next.T, mint)
+		f := linear(prevF, next.F, prev.T, next.T, mint, counterReset)
 		out = append(out, FPoint{T: mint, F: f})
 	}
 
@@ -4204,10 +4207,7 @@ func smoothFloats(floats []FPoint, out []FPoint, mint, maxt int64, counterReset 
 	case i > 0:
 		prev, next := floats[i-1], floats[i]
 		prevF := prev.F
-		if counterReset && prevF > next.F {
-			prevF = 0
-		}
-		f := linear(prevF, next.F, prev.T, next.T, maxt)
+		f := linear(prevF, next.F, prev.T, next.T, maxt, counterReset)
 		out = append(out, FPoint{T: maxt, F: f})
 	}
 

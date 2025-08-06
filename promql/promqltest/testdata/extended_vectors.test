@@ -219,3 +219,5 @@ eval instant at 5m increase(metric[5m] anchored)
     {id="1"} 5
     {id="2"} 10
     {id="3"} 15
+
+eval instant at 15m increase(metric[5m] anchored)
