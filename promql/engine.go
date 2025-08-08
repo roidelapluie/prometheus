@@ -1850,13 +1850,27 @@ func (ev *evaluator) eval(ctx context.Context, expr parser.Expr) (parser.Value, 
 		sel := arg.(*parser.MatrixSelector)
 		selVS := sel.VectorSelector.(*parser.VectorSelector)
 
-		// Anchored works with: increase, and delta.
-		if selVS.Anchored && e.Func.Name != "increase" && e.Func.Name != "delta" {
-			warnings.Add(annotations.NewAnchoredWithUnsupportedFunctionWarning(e.Func.Name, e.Args[matrixArgIndex].PositionRange()))
-		}
-		// Smoothed works with: deriv, and rate.
-		if selVS.Smoothed && e.Func.Name != "deriv" && e.Func.Name != "rate" {
-			warnings.Add(annotations.NewSmoothedWithUnsupportedFunctionWarning(e.Func.Name, e.Args[matrixArgIndex].PositionRange()))
+		switch {
+		case selVS.Anchored:
+			validAnchoredFuncs := map[string]struct{}{
+				"resets":   {},
+				"changes":  {},
+				"rate":     {},
+				"increase": {},
+				"delta":    {},
+			}
+			if _, ok := validAnchoredFuncs[e.Func.Name]; !ok {
+				ev.errorf("anchored modifier can only be used with: resets, changes, rate, increase, or delta - not with %s", e.Func.Name)
+			}
+		case selVS.Smoothed:
+			validSmoothedFuncs := map[string]struct{}{
+				"rate":     {},
+				"increase": {},
+				"delta":    {},
+			}
+			if _, ok := validSmoothedFuncs[e.Func.Name]; !ok {
+				ev.errorf("smoothed modifier can only be used with: rate, increase, or delta - not with %s", e.Func.Name)
+			}
 		}
 
 		ws, err := checkAndExpandSeriesSet(ctx, sel)

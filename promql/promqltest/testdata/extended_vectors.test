@@ -200,6 +200,23 @@ eval instant at 1m30s increase(metric[1m] anchored)
     {id="2"} 2
     {id="3"} 3
 
+eval instant at 1m30s delta(metric[1m])
+
+eval instant at 1m30s delta(metric[1m] anchored)
+    {id="1"} 1
+    {id="2"} -1
+    {id="3"} 3
+
+eval instant at 3m0s delta(metric[1m] anchored)
+    {id="1"} 1
+    {id="2"} 2
+    {id="3"} -8
+
+eval instant at 3m30s delta(metric[1m] anchored)
+    {id="1"} 1
+    {id="2"} 2
+    {id="3"} -8
+
 eval instant at 6m increase(metric[5m])
     {id="1"} 5
     {id="2"} 10
@@ -221,3 +238,117 @@ eval instant at 5m increase(metric[5m] anchored)
     {id="3"} 15
 
 eval instant at 15m increase(metric[5m] anchored)
+
+clear
+load 1m
+    metric{id="1"} 11 -1 100 0
+    metric{id="2"} 0 0 100 0 0 11 -1
+
+eval instant at 5m30s delta(metric[5m] smoothed)
+    {id="1"} -5
+    {id="2"} 5
+
+eval instant at 5m45s delta(metric[5m] smoothed)
+    {id="1"} -2
+    {id="2"} 2
+
+clear
+load 1m
+    metric{id="1"} 1+1x10
+    metric{id="2"} 1 1+1x10
+    metric{id="3"} 99-1x10
+    metric{id="4"} 99 99-1x10
+
+eval instant at 5m changes(metric[5m])
+    {id="1"} 4
+    {id="2"} 4
+    {id="3"} 4
+    {id="4"} 4
+
+eval instant at 5m30s changes(metric[5m])
+    {id="1"} 4
+    {id="2"} 4
+    {id="3"} 4
+    {id="4"} 4
+
+
+eval instant at 5m0s changes(metric[5m] anchored)
+    {id="1"} 5
+    {id="2"} 4
+    {id="3"} 5
+    {id="4"} 4
+
+eval instant at 6m changes(metric[5m] anchored)
+    {id="1"} 5
+    {id="2"} 5
+    {id="3"} 5
+    {id="4"} 5
+
+eval instant at 5m30s changes(metric[5m] anchored)
+    {id="1"} 5
+    {id="2"} 4
+    {id="3"} 5
+    {id="4"} 4
+
+eval instant at 5m30s resets(metric[5m])
+    {id="1"} 0
+    {id="2"} 0
+    {id="3"} 4
+    {id="4"} 4
+
+eval instant at 5m30s resets(metric[5m] anchored)
+    {id="1"} 0
+    {id="2"} 0
+    {id="3"} 5
+    {id="4"} 4
+
+clear
+load 1m
+    metric{id="1"} 2 _ 1 _ _ _ _ _ 0
+    metric{id="2"} 99-1x10
+
+eval instant at 2m changes(metric[1m])
+    {id="1"} 0
+    {id="2"} 0
+
+eval instant at 3m changes(metric[1m])
+    {id="2"} 0
+
+eval instant at 2m changes(metric[1m] anchored)
+    {id="1"} 1
+    {id="2"} 1
+
+eval instant at 3m changes(metric[1m] anchored)
+    {id="1"} 1
+    {id="2"} 1
+
+eval instant at 8m changes(metric[1m] anchored)
+    {id="1"} 0
+    {id="2"} 1
+
+eval instant at 8m changes(metric[1m1ms] anchored)
+    {id="1"} 1
+    {id="2"} 2
+
+eval instant at 2m resets(metric[1m])
+    {id="1"} 0
+    {id="2"} 0
+
+eval instant at 3m resets(metric[1m])
+    {id="2"} 0
+
+eval instant at 2m resets(metric[1m] anchored)
+    {id="1"} 1
+    {id="2"} 1
+
+eval instant at 3m resets(metric[1m] anchored)
+    {id="1"} 1
+    {id="2"} 1
+
+eval instant at 8m resets(metric[1m] anchored)
+    {id="1"} 0
+    {id="2"} 1
+
+eval instant at 8m resets(metric[1m1ms] anchored)
+    {id="1"} 1
+    {id="2"} 2
