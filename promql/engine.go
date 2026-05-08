@@ -1766,9 +1766,11 @@ func (ev *evaluator) smoothSeries(series []storage.Series, offset time.Duration,
 
 				case i > 0 && i < len(hists):
 					// Interpolate between prev and next.
-					// TODO: detect if the sample is a counter, based on __type__ or metadata.
+					// Use CounterResetHint to determine counter vs gauge: treat as counter
+					// unless both samples explicitly carry the gauge hint.
 					prev, next := hists[i-1], hists[i]
-					h, err := interpolateHistograms(prev.H, prev.T, next.H, next.T, dataTS, false)
+					isCounter := prev.H.CounterResetHint != histogram.GaugeType || next.H.CounterResetHint != histogram.GaugeType
+					h, err := interpolateHistograms(prev.H, prev.T, next.H, next.T, dataTS, isCounter, &annos, pos)
 					if err != nil {
 						annos = annosFromInterpolationError(annos, err, s.Labels().Get(labels.MetricName), pos)
 						continue

@@ -111,8 +111,9 @@ func interpolate(p1, p2 FPoint, t int64, isCounter bool) float64 {
 // If isCounter is true and there is a counter reset, it models the counter
 // as starting from 0 (post-reset) by returning h2 scaled by the fraction.
 // It returns an error if the histograms are incompatible (e.g. mixing
-// exponential and custom-bucket schemas).
-func interpolateHistograms(h1 *histogram.FloatHistogram, t1 int64, h2 *histogram.FloatHistogram, t2, t int64, isCounter bool) (*histogram.FloatHistogram, error) {
+// exponential and custom-bucket schemas). NHCB bucket-bounds reconciliation
+// warnings are collected into annos.
+func interpolateHistograms(h1 *histogram.FloatHistogram, t1 int64, h2 *histogram.FloatHistogram, t2, t int64, isCounter bool, annos *annotations.Annotations, pos posrange.PositionRange) (*histogram.FloatHistogram, error) {
 	if t == t1 {
 		return h1.Copy(), nil
 	}
@@ -127,24 +128,31 @@ func interpolateHistograms(h1 *histogram.FloatHistogram, t1 int64, h2 *histogram
 	}
 
 	// Result = H1 + (H2 - H1) * fraction.
-	base := h1.Copy()
 	delta := h2.Copy()
-	if _, _, _, err := delta.Sub(base); err != nil {
+	_, _, nhcbReconciled, err := delta.Sub(h1)
+	if err != nil {
 		return nil, err
+	}
+	if nhcbReconciled {
+		annos.Add(annotations.NewMismatchedCustomBucketsHistogramsInfo(pos, annotations.HistogramSub))
 	}
 	delta.Mul(fraction)
-	if _, _, _, err := base.Add(delta); err != nil {
+	_, _, nhcbReconciled, err = delta.Add(h1)
+	if err != nil {
 		return nil, err
 	}
-	return base, nil
+	if nhcbReconciled {
+		annos.Add(annotations.NewMismatchedCustomBucketsHistogramsInfo(pos, annotations.HistogramAdd))
+	}
+	return delta, nil
 }
 
 // pickOrInterpolateLeftHistogram returns the histogram at the left boundary of the range.
 // If interpolation is needed (when smoothed is true and the first sample is before the range start),
 // it returns the interpolated histogram at the left boundary; otherwise, it returns a copy of the first sample's histogram.
-func pickOrInterpolateLeftHistogram(hists []HPoint, first int, rangeStart int64, smoothed, isCounter bool) (*histogram.FloatHistogram, error) {
+func pickOrInterpolateLeftHistogram(hists []HPoint, first int, rangeStart int64, smoothed, isCounter bool, annos *annotations.Annotations, pos posrange.PositionRange) (*histogram.FloatHistogram, error) {
 	if smoothed && hists[first].T < rangeStart {
-		return interpolateHistograms(hists[first].H, hists[first].T, hists[first+1].H, hists[first+1].T, rangeStart, isCounter)
+		return interpolateHistograms(hists[first].H, hists[first].T, hists[first+1].H, hists[first+1].T, rangeStart, isCounter, annos, pos)
 	}
 	return hists[first].H.Copy(), nil
 }
@@ -152,9 +160,9 @@ func pickOrInterpolateLeftHistogram(hists []HPoint, first int, rangeStart int64,
 // pickOrInterpolateRightHistogram returns the histogram at the right boundary of the range.
 // If interpolation is needed (when smoothed is true and the last sample is after the range end),
 // it returns the interpolated histogram at the right boundary; otherwise, it returns a copy of the last sample's histogram.
-func pickOrInterpolateRightHistogram(hists []HPoint, last int, rangeEnd int64, smoothed, isCounter bool) (*histogram.FloatHistogram, error) {
+func pickOrInterpolateRightHistogram(hists []HPoint, last int, rangeEnd int64, smoothed, isCounter bool, annos *annotations.Annotations, pos posrange.PositionRange) (*histogram.FloatHistogram, error) {
 	if smoothed && last > 0 && hists[last].T > rangeEnd {
-		return interpolateHistograms(hists[last-1].H, hists[last-1].T, hists[last].H, hists[last].T, rangeEnd, isCounter)
+		return interpolateHistograms(hists[last-1].H, hists[last-1].T, hists[last].H, hists[last].T, rangeEnd, isCounter, annos, pos)
 	}
 	return hists[last].H.Copy(), nil
 }
@@ -342,28 +350,20 @@ func extendedHistogramRate(vals Matrix, args parser.Expressions, enh *EvalNodeHe
 	}
 
 	usingCustomBuckets := h[firstSampleIndex].H.UsesCustomBuckets()
-	if isCounter {
-		for _, p := range h[firstSampleIndex : lastSampleIndex+1] {
-			if p.H.UsesCustomBuckets() != usingCustomBuckets {
-				return enh.Out, annos.Add(annotations.NewMixedExponentialCustomHistogramsWarning(metricName, pos))
-			}
-			if p.H.CounterResetHint == histogram.GaugeType {
-				annos.Add(annotations.NewNativeHistogramNotCounterWarning(metricName, pos))
-			}
+	for _, p := range h[firstSampleIndex : lastSampleIndex+1] {
+		if p.H.UsesCustomBuckets() != usingCustomBuckets {
+			return enh.Out, annos.Add(annotations.NewMixedExponentialCustomHistogramsWarning(metricName, pos))
 		}
-	} else {
-		for _, p := range h[firstSampleIndex : lastSampleIndex+1] {
-			if p.H.UsesCustomBuckets() != usingCustomBuckets {
-				return enh.Out, annos.Add(annotations.NewMixedExponentialCustomHistogramsWarning(metricName, pos))
-			}
+		if isCounter && p.H.CounterResetHint == histogram.GaugeType {
+			annos.Add(annotations.NewNativeHistogramNotCounterWarning(metricName, pos))
 		}
 	}
 
-	left, err := pickOrInterpolateLeftHistogram(h, firstSampleIndex, rangeStart, smoothed, isCounter)
+	left, err := pickOrInterpolateLeftHistogram(h, firstSampleIndex, rangeStart, smoothed, isCounter, &annos, pos)
 	if err != nil {
 		return enh.Out, annosFromInterpolationError(annos, err, metricName, pos)
 	}
-	right, err := pickOrInterpolateRightHistogram(h, lastSampleIndex, rangeEnd, smoothed, isCounter)
+	right, err := pickOrInterpolateRightHistogram(h, lastSampleIndex, rangeEnd, smoothed, isCounter, &annos, pos)
 	if err != nil {
 		return enh.Out, annosFromInterpolationError(annos, err, metricName, pos)
 	}
@@ -430,7 +430,7 @@ func extrapolatedRate(vals Matrix, args parser.Expressions, enh *EvalNodeHelper,
 	if vs.Anchored || vs.Smoothed {
 		samples := vals[0]
 		if len(samples.Histograms) > 0 && len(samples.Floats) > 0 {
-			annos := annotations.Annotations{}
+			var annos annotations.Annotations
 			return enh.Out, annos.Add(annotations.NewMixedFloatsHistogramsWarning(getMetricName(samples.Metric), args[0].PositionRange()))
 		}
 		if len(samples.Histograms) > 0 {
