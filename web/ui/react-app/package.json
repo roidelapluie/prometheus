@@ -1,6 +1,6 @@
 {
   "name": "@prometheus-io/app",
-  "version": "0.300.1",
+  "version": "0.311.3",
   "private": true,
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",
@@ -11,6 +11,7 @@
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.36.6",
     "@forevolve/bootstrap-dark": "^4.0.2",
+    "@fortawesome/fontawesome-common-types": "6.7.2",
     "@fortawesome/fontawesome-svg-core": "6.7.2",
     "@fortawesome/free-solid-svg-icons": "6.7.2",
     "@fortawesome/react-fontawesome": "0.2.2",
@@ -97,11 +98,11 @@
       "enzyme-to-json/serializer"
     ],
     "transformIgnorePatterns": [
-      "<rootDir>/../node_modules/(?!@prometheus-io/codemirror-promql)/",
-      "<rootDir>/../node_modules/(?!@prometheus-io/lezer-promql)/"
+      "<rootDir>/node_modules/(?!@prometheus-io/codemirror-promql)/",
+      "<rootDir>/node_modules/(?!@prometheus-io/lezer-promql)/"
     ],
     "moduleNameMapper": {
-      "lezer-promql": "<rootDir>/../node_modules/@prometheus-io/lezer-promql/dist/index.cjs"
+      "lezer-promql": "<rootDir>/node_modules/@prometheus-io/lezer-promql/dist/index.cjs"
     }
   },
   "optionalDependencies": {
