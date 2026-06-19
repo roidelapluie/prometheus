@@ -7,6 +7,7 @@ import ASTNode, { nodeType } from "../../../promql/ast";
 import funcDocs from "../../../promql/functionDocs";
 import { escapeString } from "../../../promql/utils";
 import { formatPrometheusDuration } from "../../../lib/formatTime";
+import { prometheusDocsBaseURL } from "../../../lib/docsURL";
 import classes from "./ExplainView.module.css";
 import SelectorExplainView from "./Selector";
 import AggregationExplainView from "./Aggregation";
@@ -59,7 +60,7 @@ const ExplainView: FC<ExplainViewProps> = ({
             This node calls the{" "}
             <Anchor
               fz="inherit"
-              href={`https://prometheus.io/docs/prometheus/latest/querying/functions/#${node.func.name}`}
+              href={`${prometheusDocsBaseURL}querying/functions/#${node.func.name}`}
               target="_blank"
             >
               <span className="promql-code promql-keyword">
@@ -69,8 +70,6 @@ const ExplainView: FC<ExplainViewProps> = ({
             function{node.args.length > 0 ? " on the provided inputs" : ""}.
           </Text>
           <Divider my="md" />
-          {/* TODO: Some docs, like x_over_time, have relative links pointing back to the Prometheus docs,
-          make sure to modify those links in the docs extraction so they work from the explain view */}
           <Text fz="sm" className={classes.funcDoc}>
             {funcDocs[node.func.name]}
           </Text>

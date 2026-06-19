@@ -16,12 +16,15 @@
         web app was served. It has to be represented as a string, because booleans can be mangled to !1 in
         production builds.
       - LOOKBACKDELTA_PLACEHOLDER is replaced by the default lookback delta duration used for queries.
+      - VERSION_PLACEHOLDER is replaced by the running Prometheus version, used to build
+        version-specific documentation links.
     -->
     <script>
       const GLOBAL_CONSOLES_LINK='CONSOLES_LINK_PLACEHOLDER';
       const GLOBAL_AGENT_MODE='AGENT_MODE_PLACEHOLDER';
       const GLOBAL_READY='READY_PLACEHOLDER';
       const GLOBAL_LOOKBACKDELTA='LOOKBACKDELTA_PLACEHOLDER';
+      const GLOBAL_VERSION='VERSION_PLACEHOLDER';
     </script>
 
     <!--

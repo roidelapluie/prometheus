@@ -61,6 +61,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeSelector } from "./components/ThemeSelector";
 import { Notifications } from "@mantine/notifications";
 import { useSettings } from "./state/settingsSlice";
+import { prometheusDocsBaseURL } from "./lib/docsURL";
 import SettingsMenu from "./components/SettingsMenu";
 import ReadinessWrapper from "./components/ReadinessWrapper";
 import NotificationsProvider from "./components/NotificationsProvider";
@@ -304,7 +305,7 @@ function App() {
       <SettingsMenu />
       <ActionIcon
         component="a"
-        href="https://prometheus.io/docs/prometheus/latest/getting_started/"
+        href={`${prometheusDocsBaseURL}getting_started/`}
         target="_blank"
         color="gray"
         title="Documentation"

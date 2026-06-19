@@ -527,6 +527,11 @@ func New(logger *slog.Logger, o *Options) *Handler {
 		replacedIdx = bytes.ReplaceAll(replacedIdx, []byte("AGENT_MODE_PLACEHOLDER"), []byte(strconv.FormatBool(h.options.IsAgent)))
 		replacedIdx = bytes.ReplaceAll(replacedIdx, []byte("READY_PLACEHOLDER"), []byte(strconv.FormatBool(h.isReady())))
 		replacedIdx = bytes.ReplaceAll(replacedIdx, []byte("LOOKBACKDELTA_PLACEHOLDER"), []byte(model.Duration(h.options.LookbackDelta).String()))
+		version := ""
+		if h.options.Version != nil {
+			version = h.options.Version.Version
+		}
+		replacedIdx = bytes.ReplaceAll(replacedIdx, []byte("VERSION_PLACEHOLDER"), []byte(version))
 		w.Write(replacedIdx)
 	}
 

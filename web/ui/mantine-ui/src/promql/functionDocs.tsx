@@ -1,4 +1,5 @@
 import React from "react";
+import { prometheusDocsBaseURL } from "../lib/docsURL";
 
 const funcDocs: Record<string, React.ReactNode> = {
   abs: (
@@ -530,7 +531,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -850,7 +851,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -1075,7 +1076,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       <p>
         <strong>
           This function has to be enabled via the{" "}
-          <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+          <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
           <code>--enable-feature=promql-experimental-functions</code>.
         </strong>
       </p>
@@ -1107,7 +1108,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       <p>
         <strong>
           This function has to be enabled via the{" "}
-          <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+          <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
           <code>--enable-feature=promql-experimental-functions</code>.
         </strong>
       </p>
@@ -1181,7 +1182,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -1564,7 +1565,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       <p>
         <strong>
           This function has to be enabled via the{" "}
-          <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+          <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
           <code>--enable-feature=promql-experimental-functions</code>.
         </strong>
       </p>
@@ -1708,7 +1709,7 @@ const funcDocs: Record<string, React.ReactNode> = {
         </a>
         . The behavior of this function may change in future versions of Prometheus, including its removal from PromQL.{" "}
         <code>info</code> has to be enabled via the
-        <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>{" "}
+        <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>{" "}
         <code>--enable-feature=promql-experimental-functions</code>._
       </p>
 
@@ -2013,7 +2014,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -2164,7 +2165,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -2233,7 +2234,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       <p>
         <strong>
           This function has to be enabled via the{" "}
-          <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+          <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
           <code>--enable-feature=promql-experimental-functions</code>.
         </strong>
       </p>
@@ -2290,7 +2291,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -2359,7 +2360,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       <p>
         <strong>
           This function has to be enabled via the{" "}
-          <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+          <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
           <code>--enable-feature=promql-experimental-functions</code>.
         </strong>
       </p>
@@ -2416,7 +2417,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -2632,7 +2633,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -2742,7 +2743,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -2881,7 +2882,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       <p>
         <strong>
           This function has to be enabled via the{" "}
-          <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+          <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
           <code>--enable-feature=promql-experimental-functions</code>.
         </strong>
       </p>
@@ -3141,7 +3142,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       <p>
         <strong>
           This function has to be enabled via the{" "}
-          <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+          <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
           <code>--enable-feature=promql-experimental-functions</code>.
         </strong>
       </p>
@@ -3169,7 +3170,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       <p>
         <strong>
           This function has to be enabled via the{" "}
-          <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+          <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
           <code>--enable-feature=promql-experimental-functions</code>.
         </strong>
       </p>
@@ -3199,7 +3200,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       <p>
         <strong>
           This function has to be enabled via the{" "}
-          <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+          <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
           <code>--enable-feature=promql-experimental-functions</code>.
         </strong>
       </p>
@@ -3256,7 +3257,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -3366,7 +3367,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -3435,7 +3436,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       <p>
         <strong>
           This function has to be enabled via the{" "}
-          <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+          <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
           <code>--enable-feature=promql-experimental-functions</code>.
         </strong>
       </p>
@@ -3492,7 +3493,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -3758,7 +3759,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -3868,7 +3869,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -3978,7 +3979,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
@@ -4088,7 +4089,7 @@ const funcDocs: Record<string, React.ReactNode> = {
       </ul>
 
       <p>
-        If the <a href="../feature_flags.md#experimental-promql-functions">feature flag</a>
+        If the <a href={`${prometheusDocsBaseURL}feature_flags/#experimental-promql-functions`}>feature flag</a>
         <code>--enable-feature=promql-experimental-functions</code> is set, the following additional functions are
         available:
       </p>
