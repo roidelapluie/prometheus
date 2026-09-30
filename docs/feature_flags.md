@@ -48,7 +48,7 @@ statistics. The following sample statistics are included:
 - **samplesRead** / **samplesReadPerStep**: Total number of samples *read* (I/O). For range-vector functions in range queries, only *new* points per step are counted (step 0: full window; later steps: points not seen in the previous step). For other query types, this equals totalQueryableSamples.
 - **peakSamples**: Peak number of samples in memory during evaluation (used for the `query.max-samples` limit).
 
-The Prometheus server exposes two counters for observability: `prometheus_engine_query_samples_total` (samples loaded, full window per step) and `prometheus_engine_query_samples_read_total` (samples read, delta per step for range-vector).
+The Prometheus server exposes two counters for observability: `prometheus_engine_query_samples_total` (logical underlying sample consumption, full window per step) and `prometheus_engine_query_samples_read_total` (samples read, delta per step for range-vector).
 
 When disabled in either the engine or the query, per-step statistics are not
 computed at all.

@@ -4498,7 +4498,7 @@ components:
                     properties:
                         totalQueryableSamples:
                             type: integer
-                            description: Total number of samples that were queryable.
+                            description: Logical underlying sample consumption, including subqueries but excluding their materialized results. Overlapping windows can count the same sample repeatedly.
                         peakSamples:
                             type: integer
                             description: Peak number of samples in memory.
@@ -4511,14 +4511,14 @@ components:
                                 maxItems: 2
                                 minItems: 2
                                 description: Timestamp and sample count as [timestamp, count].
-                            description: Total queryable samples per step (only included with stats=all).
+                            description: Logical underlying sample consumption per step (only included with stats=all).
                         seriesTouched:
                             type: integer
                             format: int64
                             description: Number of series consumed during execution, summed across selectors. Repeated selectors can count the same series more than once.
                         samplesRead:
                             type: integer
-                            description: Total number of samples read (I/O). For range-vector in range queries, only new points per step.
+                            description: Evaluator input samples, counting only new points across overlapping range-vector windows. With query-cost enabled, includes all evaluated subquery steps; otherwise only consumed windows. Not physical storage I/O.
                         samplesReadPerStep:
                             type: array
                             items:

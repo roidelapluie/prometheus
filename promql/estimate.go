@@ -611,7 +611,7 @@ func selectorEvaluationSteps(stmt *parser.EvalStmt, path []parser.Node, defaultS
 				step = defaultStep
 			}
 			subqInterval := max(step.Milliseconds(), 1)
-			start, end = subqueryEvaluationTimes(start, end, interval, offset, n.Range.Milliseconds(), subqInterval)
+			start, end = subqueryEvaluationTimes(start, end, interval, offset, n.Range.Milliseconds(), subqInterval, n.Timestamp != nil)
 			interval = subqInterval
 		}
 	}

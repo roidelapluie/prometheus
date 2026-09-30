@@ -982,6 +982,13 @@ load 10s
 	engine := newQueryCostEngine(t)
 	for _, query := range []string{
 		"sum_over_time(metric[5m:1m])",
+		"quantile_over_time(time() / 10000, metric[20s:10s] @ 200)",
+		"quantile_over_time(time() / 10000, metric[20s:10s] @ 200 offset 1m)",
+		"quantile_over_time(time() / 10000, metric[20s:10s] @ 200 offset -1m)",
+		"quantile_over_time(time() / 10000, metric[20s:10s] @ 10000)",
+		"quantile_over_time(time() / 10000, metric[20s:] @ start())",
+		"quantile_over_time(time() / 10000, metric[20s:10s] @ end())",
+		"sum_over_time(quantile_over_time(time() / 10000, metric[20s:10s] @ 200)[20s:10s])",
 		"sum_over_time(metric[1s:1m])",
 		"sum_over_time(sum_over_time(metric[20m:1m] @ 3000)[5m:1m])",
 		"sum_over_time(sum_over_time(metric[20m:1m] offset 25s)[5m:1m] @ 3000)",

@@ -2434,14 +2434,18 @@ func (ev *evaluator) subqueryTimeRange(e *parser.SubqueryExpr) (start, end, inte
 	} else {
 		interval = ev.noStepSubqueryIntervalFn(rangeMillis)
 	}
-	start, end = subqueryEvaluationTimes(ev.startTimestamp, ev.endTimestamp, ev.interval, offsetMillis, rangeMillis, interval)
+	start, end = subqueryEvaluationTimes(ev.startTimestamp, ev.endTimestamp, ev.interval, offsetMillis, rangeMillis, interval, e.Timestamp != nil)
 	return start, end, interval
 }
 
 // Align a subquery to its own resolution after truncating the parent's end to
 // its last evaluation step. Both execution and estimation use this grid.
-func subqueryEvaluationTimes(start, end, interval, offset, rangeMillis, subqInterval int64) (int64, int64) {
-	if interval > 0 {
+func subqueryEvaluationTimes(start, end, interval, offset, rangeMillis, subqInterval int64, fixed bool) (int64, int64) {
+	if fixed {
+		// Every parent step consumes the same window with an @ modifier.
+		// The adjusted offset is relative to the parent's start timestamp.
+		end = start
+	} else if interval > 0 {
 		end = start + ((end-start)/interval)*interval
 	}
 	subqStart := subqInterval * ((start - offset - rangeMillis) / subqInterval)
@@ -2508,11 +2512,17 @@ func (ev *evaluator) evalSubquery(ctx context.Context, subq *parser.SubqueryExpr
 		Range:       outerRange,
 		AtTimestamp: subq.Timestamp,
 	}
+	// Merge underlying consumption, including nested subqueries. The outer
+	// range-vector function must not count the materialized results again.
 	ev.samplesStats.MergeTotalSamplesFromSubquery(childStats, consumer)
 	if ev.budget != nil {
 		// Charge all work performed by the child, including steps whose output
 		// falls between the parent's windows. Keep per-step statistics consistent.
 		consumer.Range = 0
+		if consumer.AtTimestamp != nil {
+			// A fixed window is evaluated once and charged to the first parent step.
+			consumer.NumSteps = 1
+		}
 	}
 	ev.samplesStats.MergeSamplesReadFromSubquery(childStats, consumer)
 	mat := val.(Matrix)
@@ -2865,7 +2875,11 @@ func (ev *evaluator) eval(ctx context.Context, expr parser.Expr) (parser.Value, 
 				// Make the function call.
 				outVec, annos := call(vectorVals, inMatrix, e.Args, enh)
 				warnings.Merge(annos)
-				ev.samplesStats.IncrementSamplesAtStep(step, fullWindowCount)
+				// Subquery consumption was already merged in evalSubquery; its
+				// materialized points do not add underlying sample consumption.
+				if !matrixFromSubquery {
+					ev.samplesStats.IncrementSamplesAtStep(step, fullWindowCount)
+				}
 				if samplesReadCount > 0 {
 					ev.samplesStats.IncrementSamplesReadAtStep(step, samplesReadCount)
 				}

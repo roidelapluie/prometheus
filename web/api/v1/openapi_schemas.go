@@ -589,7 +589,7 @@ func (*OpenAPIBuilder) queryStatsSchema() *base.SchemaProxy {
 	samplesProps := orderedmap.New[string, *base.SchemaProxy]()
 	samplesProps.Set("totalQueryableSamples", base.CreateSchemaProxy(&base.Schema{
 		Type:        []string{"integer"},
-		Description: "Total number of samples that were queryable.",
+		Description: "Logical underlying sample consumption, including subqueries but excluding their materialized results. Overlapping windows can count the same sample repeatedly.",
 	}))
 	samplesProps.Set("peakSamples", base.CreateSchemaProxy(&base.Schema{
 		Type:        []string{"integer"},
@@ -597,7 +597,7 @@ func (*OpenAPIBuilder) queryStatsSchema() *base.SchemaProxy {
 	}))
 	samplesProps.Set("totalQueryableSamplesPerStep", base.CreateSchemaProxy(&base.Schema{
 		Type:        []string{"array"},
-		Description: "Total queryable samples per step (only included with stats=all).",
+		Description: "Logical underlying sample consumption per step (only included with stats=all).",
 		Items: &base.DynamicValue[*base.SchemaProxy, bool]{A: base.CreateSchemaProxy(&base.Schema{
 			Type:        []string{"array"},
 			Description: "Timestamp and sample count as [timestamp, count].",
@@ -609,7 +609,7 @@ func (*OpenAPIBuilder) queryStatsSchema() *base.SchemaProxy {
 	samplesProps.Set("seriesTouched", integerSchemaWithDescription("Number of series consumed during execution, summed across selectors. Repeated selectors can count the same series more than once."))
 	samplesProps.Set("samplesRead", base.CreateSchemaProxy(&base.Schema{
 		Type:        []string{"integer"},
-		Description: "Total number of samples read (I/O). For range-vector in range queries, only new points per step.",
+		Description: "Evaluator input samples, counting only new points across overlapping range-vector windows. With query-cost enabled, includes all evaluated subquery steps; otherwise only consumed windows. Not physical storage I/O.",
 	}))
 	samplesProps.Set("samplesReadPerStep", base.CreateSchemaProxy(&base.Schema{
 		Type:        []string{"array"},

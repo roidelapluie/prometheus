@@ -266,14 +266,16 @@ When the `stats` parameter is set (e.g. `stats=all`), the response `data` includ
 
 - **timings**: Durations (in seconds) for different phases of query execution (e.g. `evalTotalTime`, `execQueueTime`).
 - **samples**:
-  - **totalQueryableSamples**: Total number of samples *loaded* during the query. For range-vector functions over multiple steps, each step counts the full window.
-  - **totalQueryableSamplesPerStep**: (Only with `stats=all` and when per-step stats are enabled.) Per-step count of samples loaded; same semantics as `totalQueryableSamples` per step.
-  - **samplesRead**: Total number of samples *read* (I/O). For range-vector functions in range queries, only new points per step are counted; for other queries this equals `totalQueryableSamples`.
+  - **totalQueryableSamples**: Logical underlying sample consumption. Each range-vector window counts its underlying samples, including samples consumed inside subqueries. Materialized subquery results are not counted again, while overlapping windows can count the same underlying sample repeatedly.
+  - **totalQueryableSamplesPerStep**: (Only with `stats=all` and when per-step stats are enabled.) Per-step underlying sample consumption; same semantics as `totalQueryableSamples` for the equivalent instant query.
+  - **samplesRead**: Samples read by the evaluator, counting only new points when range-vector windows overlap. With `query-cost` enabled, this includes all subquery reads, even for child steps in gaps between the consumed parent windows. Without it, subquery reads are attributed only to consumed windows. This measures evaluator input rather than physical storage I/O.
   - **samplesReadPerStep**: (Only with `stats=all` and when per-step stats are enabled.) Per-step count of samples read (delta semantics for range-vector).
   - **seriesTouched**: Number of series consumed during execution, summed across selectors. Repeated selectors can count the same series more than once. This allows comparison with the query cost estimate without requesting a second estimation through `cost=true`.
   - **peakSamples**: Peak number of samples in memory during evaluation.
 
-The server also exposes two Prometheus metrics: `prometheus_engine_query_samples_total` (samples loaded) and `prometheus_engine_query_samples_read_total` (samples read). See [Per-step stats](../feature_flags.md#per-step-stats) for the `promql-per-step-stats` feature flag.
+Floats count as one sample; native histograms are weighted by their in-memory size. Fixed `@` subqueries read their window once, charging reads to the first parent step, while each parent step counts its logical underlying consumption.
+
+The server also exposes two Prometheus metrics: `prometheus_engine_query_samples_total` (logical underlying sample consumption) and `prometheus_engine_query_samples_read_total` (samples read). See [Per-step stats](../feature_flags.md#per-step-stats) for the `promql-per-step-stats` feature flag.
 
 When the [`query-cost`](../feature_flags.md#query-cost) feature flag is enabled, the
 instant and range query endpoints accept a `cost=<bool>` parameter. It is a plain
