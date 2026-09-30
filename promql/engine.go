@@ -866,10 +866,9 @@ func (ng *Engine) newQuery(q storage.Queryable, qs string, opts QueryOpts, start
 			return nil, nil, err
 		}
 
-		// query_max_duration is a normalization of the -query.timeout flag, so
-		// when it is set it is the ceiling on its own and may exceed the flag.
-		// While it is unset the deprecated flag remains the ceiling, which keeps
-		// existing deployments unchanged.
+		// When query_max_duration is set, it supplies the duration ceiling and
+		// may exceed --query.timeout. Otherwise, the supported startup flag
+		// remains the ceiling, preserving existing behavior.
 		if ceilDuration > 0 || requestedDuration > 0 {
 			ceiling := ceilDuration
 			if ceiling <= 0 {
@@ -1043,9 +1042,9 @@ func (ng *Engine) exec(ctx context.Context, q *query) (v parser.Value, ws annota
 	}()
 
 	// Use the effective query max duration when it is set. It already accounts
-	// for the -query.timeout flag: the flag is only the ceiling while
+	// for the --query.timeout flag: the flag is only the ceiling while
 	// query_max_duration is unset, so a configured query_max_duration may be
-	// longer than the deprecated flag. An overrun surfaces as ErrQueryTimeout.
+	// longer than the flag's value. An overrun surfaces as ErrQueryTimeout.
 	timeout := ng.timeout
 	if q.maxQueryDuration > 0 {
 		timeout = q.maxQueryDuration
