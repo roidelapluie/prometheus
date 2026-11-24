@@ -108,6 +108,7 @@ func (h *Head) appenderV2() *headAppenderV2 {
 			headMaxt:              h.MaxTime(),
 			oooTimeWindow:         h.opts.OutOfOrderTimeWindow.Load(),
 			seriesRefs:            h.getRefSeriesBuffer(),
+			seriesRefsSeries:      h.getSeriesBuffer(),
 			series:                h.getSeriesBuffer(),
 			typesInBatch:          h.getTypeMap(),
 			appendID:              appendID,
@@ -229,6 +230,10 @@ func (a *headAppenderV2) Append(ref storage.SeriesRef, ls labels.Labels, st, t i
 	if a.head.opts.EnableMetadataWALRecords && !opts.Metadata.IsEmpty() {
 		s.Lock()
 		metaChanged := metadata.IsZeroHandle(s.meta) || !s.meta.Value().Equals(opts.Metadata)
+		if metaChanged {
+			// Keep the series until the metadata record is committed or rolled back.
+			s.markPendingCommit()
+		}
 		s.Unlock()
 		if metaChanged {
 			b := a.getCurrentBatch(stNone, s.ref)

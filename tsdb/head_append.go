@@ -14,12 +14,14 @@
 package tsdb
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"math"
 	"runtime"
+	"slices"
 	"time"
 	"unique"
 
@@ -194,6 +196,7 @@ func (h *Head) appender() *headAppender {
 			headMaxt:              h.MaxTime(),
 			oooTimeWindow:         h.opts.OutOfOrderTimeWindow.Load(),
 			seriesRefs:            h.getRefSeriesBuffer(),
+			seriesRefsSeries:      h.getSeriesBuffer(),
 			series:                h.getSeriesBuffer(),
 			typesInBatch:          h.getTypeMap(),
 			appendID:              appendID,
@@ -424,8 +427,12 @@ type headAppenderBase struct {
 	oooTimeWindow int64 // Use the same for the entire append, and don't load the atomic for each sample.
 
 	seriesRefs []record.RefSeries // New series records this appender may need to log.
-	series     []*memSeries       // Series created by this appender, with a creation reservation to release.
-	batches    []*appendBatch     // Holds all the other data to append. (In regular cases, there should be only one of these.)
+	// Series matching seriesRefs by index. Each one holds a pending-commit
+	// reservation until Commit or Rollback logs its record, so it cannot be
+	// garbage collected before then.
+	seriesRefsSeries []*memSeries
+	series           []*memSeries   // Series created by this appender, with a creation reservation to release.
+	batches          []*appendBatch // Holds all the other data to append. (In regular cases, there should be only one of these.)
 
 	typesInBatch map[chunks.HeadSeriesRef]sampleType // Which (one) sample type each series holds in the most recent batch.
 
@@ -1189,8 +1196,14 @@ func (a *headAppender) UpdateMetadata(ref storage.SeriesRef, lset labels.Labels,
 	}
 
 	s.Lock()
+	if s.isGCed() {
+		s.Unlock()
+		return 0, fmt.Errorf("unknown series when trying to add metadata with HeadSeriesRef: %d and labels: %s", ref, lset)
+	}
 	hasNewMetadata := metadata.IsZeroHandle(s.meta) || s.meta.Value() != meta
 	if hasNewMetadata {
+		// Keep the series until the metadata record is committed or rolled back.
+		s.markPendingCommit()
 		a.trackSeriesRecord(s, s.lset)
 	}
 	s.Unlock()
@@ -1227,6 +1240,8 @@ const (
 )
 
 // trackSeriesRecord buffers a candidate WAL series record if the series still needs one.
+// The caller must hold a pending-commit reservation on s until Commit or
+// Rollback, so that s cannot be garbage collected before its record is logged.
 // The labels must be a snapshot obtained while holding the series lock, or the
 // immutable labels used to create the series.
 func (a *headAppenderBase) trackSeriesRecord(s *memSeries, lset labels.Labels) {
@@ -1235,77 +1250,72 @@ func (a *headAppenderBase) trackSeriesRecord(s *memSeries, lset labels.Labels) {
 	}
 	// Avoid consecutive duplicates - for example when we create a series and append its first sample.
 	// logSeriesRecords performs full deduplication.
-	if n := len(a.seriesRefs); n > 0 && a.seriesRefs[n-1].Ref == s.ref {
+	if n := len(a.seriesRefsSeries); n > 0 && a.seriesRefsSeries[n-1] == s {
 		return
 	}
 	a.seriesRefs = append(a.seriesRefs, record.RefSeries{Ref: s.ref, Labels: lset})
+	a.seriesRefsSeries = append(a.seriesRefsSeries, s)
 }
 
-// logSeriesRecords selects and writes the WAL series records still needed
-// under the WAL's existing write lock.
-// Looking up each ref there excludes series removed from the head index. If GC
-// unlinks a series after that lookup, its series record still precedes any
-// tombstone or replacement data, since those writes acquire the same WAL lock.
+// keepUnloggedSeriesRecords drops the candidates whose series record is
+// already logged and keeps those matching keep, reporting how many remain.
+func (a *headAppenderBase) keepUnloggedSeriesRecords(keep func(*memSeries) bool) int {
+	n := 0
+	for i, s := range a.seriesRefsSeries {
+		if !keep(s) {
+			continue
+		}
+		a.seriesRefs[n], a.seriesRefsSeries[n] = a.seriesRefs[i], s
+		n++
+	}
+	clear(a.seriesRefs[n:])
+	clear(a.seriesRefsSeries[n:])
+	a.seriesRefs, a.seriesRefsSeries = a.seriesRefs[:n], a.seriesRefsSeries[:n]
+	return n
+}
+
+// logSeriesRecords writes the WAL series records that no other appender has
+// written yet. Once it returns without error, every tracked series has its
+// record in the WAL, so this appender's dependent records can follow.
+//
+// Series records are serialized by Head.walSeriesMtx rather than the WAL's own
+// lock, so that concurrent WAL writes for existing series are not blocked by
+// the filtering and label encoding done here.
 func (a *headAppenderBase) logSeriesRecords(enc record.Encoder, buf []byte) ([]byte, error) {
-	if len(a.seriesRefs) == 0 {
+	// Most commits only reference series that are already logged, and need no lock.
+	if a.keepUnloggedSeriesRecords(func(s *memSeries) bool {
+		return s.walState.Load() != seriesWALLogged
+	}) == 0 {
 		return buf, nil
 	}
 
-	// Creation reservations keep our own series alive until commit or rollback
-	// finishes. They are ordered by ref, so the usual new-series batch needs no
-	// index lookups. Other appenders' series must still be checked against the head index.
-	owned := 0
-	lookup := func(decl record.RefSeries) *memSeries {
-		for owned < len(a.series) && a.series[owned].ref < decl.Ref {
-			owned++
+	h := a.head
+	h.walSeriesMtx.Lock()
+	defer h.walSeriesMtx.Unlock()
+
+	// Under walSeriesMtx, the state is seriesWALWriting only for duplicates
+	// marked by this loop.
+	if a.keepUnloggedSeriesRecords(func(s *memSeries) bool {
+		if s.walState.Load() != seriesWALUnlogged {
+			return false
 		}
-		if owned < len(a.series) && a.series[owned].ref == decl.Ref {
-			return a.series[owned]
-		}
-		if s := a.head.series.getByID(decl.Ref); s != nil {
-			return s
-		}
-		// A new series is visible by labels just before it is indexed by ref.
-		// Match the ref as well, since these labels may already have a replacement.
-		if s := a.head.series.getByHash(decl.Labels.Hash(), decl.Labels); s != nil && s.ref == decl.Ref {
-			return s
-		}
-		return nil
+		s.walState.Store(seriesWALWriting)
+		return true
+	}) == 0 {
+		return buf, nil
 	}
-	err := a.head.wal.LogWithCallbacks(func() []byte {
-		n := 0
-		for i, decl := range a.seriesRefs {
-			s := lookup(decl)
-			if s == nil || s.walState.Load() != seriesWALUnlogged {
-				continue
-			}
-			// This temporary state also deduplicates refs within this appender.
-			s.walState.Store(seriesWALWriting)
-			if n != i {
-				a.seriesRefs[n] = decl
-			}
-			n++
-		}
-		clear(a.seriesRefs[n:])
-		a.seriesRefs = a.seriesRefs[:n]
-		if n == 0 {
-			return nil
-		}
-		rec := enc.Series(a.seriesRefs, buf)
-		buf = rec[:0]
-		return rec
-	}, func(err error) {
-		state := seriesWALLogged
-		if err != nil {
-			state = seriesWALUnlogged
-		}
-		owned = 0
-		for _, decl := range a.seriesRefs {
-			if s := lookup(decl); s != nil {
-				s.walState.Store(state)
-			}
-		}
-	})
+
+	rec := enc.Series(a.seriesRefs, buf)
+	buf = rec[:0]
+	err := h.wal.Log(rec)
+	state := seriesWALLogged
+	if err != nil {
+		// Leave the series eligible for retry by another appender.
+		state = seriesWALUnlogged
+	}
+	for _, s := range a.seriesRefsSeries {
+		s.walState.Store(state)
+	}
 	if err != nil {
 		return buf, fmt.Errorf("log series: %w", err)
 	}
@@ -1958,6 +1968,16 @@ func commitMetadata(b *appendBatch) {
 	}
 }
 
+// releaseMetadataReservations releases the reservations taken when queueing
+// the batch's metadata.
+func (a *headAppenderBase) releaseMetadataReservations(b *appendBatch) {
+	for _, s := range b.metadataSeries {
+		s.Lock()
+		a.releasePendingCommit(s)
+		s.Unlock()
+	}
+}
+
 func (a *headAppenderBase) releaseCreatedSeriesReservations() {
 	for _, s := range a.series {
 		s.Lock()
@@ -1995,6 +2015,7 @@ func (a *headAppenderBase) Commit() (err error) {
 			return
 		}
 		h.putRefSeriesBuffer(a.seriesRefs)
+		h.putSeriesBuffer(a.seriesRefsSeries)
 		h.putSeriesBuffer(a.series)
 		h.putTypeMap(a.typesInBatch)
 		a.closed = true
@@ -2052,6 +2073,7 @@ func (a *headAppenderBase) Commit() (err error) {
 		a.commitHistograms(b, acc)
 		a.commitFloatHistograms(b, acc)
 		commitMetadata(b)
+		a.releaseMetadataReservations(b)
 	}
 	// Release the reservations that protected newly indexed series before their first sample was queued.
 	a.releaseCreatedSeriesReservations()
@@ -2544,6 +2566,7 @@ func (a *headAppenderBase) Rollback() (err error) {
 		h.metrics.activeAppenders.Dec()
 		a.closed = true
 		h.putRefSeriesBuffer(a.seriesRefs)
+		h.putSeriesBuffer(a.seriesRefsSeries)
 		h.putSeriesBuffer(a.series)
 		h.putTypeMap(a.typesInBatch)
 	}()
@@ -2576,10 +2599,19 @@ func (a *headAppenderBase) Rollback() (err error) {
 			a.releasePendingCommit(e.series)
 			e.series.Unlock()
 		}
+		a.releaseMetadataReservations(b)
 		b.close(h)
 	}
 	a.batches = a.batches[:0]
 	// Series are created in the head memory regardless of rollback. Thus we have
-	// to log them to the WAL in any case.
+	// to log them to the WAL in any case. Only the series created by this
+	// appender still hold a reservation, and no dependent record follows, so
+	// skip the series borrowed from other appenders.
+	a.keepUnloggedSeriesRecords(func(s *memSeries) bool {
+		_, owned := slices.BinarySearchFunc(a.series, s.ref, func(c *memSeries, ref chunks.HeadSeriesRef) int {
+			return cmp.Compare(c.ref, ref)
+		})
+		return owned
+	})
 	return a.log()
 }

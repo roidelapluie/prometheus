@@ -124,6 +124,12 @@ type Head struct {
 	walExpiriesMtx sync.Mutex
 	walExpiries    map[chunks.HeadSeriesRef]int64 // Series no longer in the head, and what time they must be kept until.
 
+	// walSeriesMtx serializes the WAL series records written by appenders, so
+	// that the first appender to commit a new series logs its record exactly
+	// once. It only serializes series record writers, never other WAL writes.
+	// Lock order: walSeriesMtx, then the WAL's own lock.
+	walSeriesMtx sync.Mutex
+
 	wblPinnedSeriesRefsMtx sync.Mutex
 	// Series references that the WBL uses. WAL replay maps each one onto a
 	// series that the head holds under a different reference. The mapping

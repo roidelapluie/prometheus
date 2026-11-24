@@ -25,7 +25,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	prom_testutil "github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
@@ -381,93 +380,42 @@ func TestWALSeriesRecordDuringSeriesPublication(t *testing.T) {
 func TestWALSeriesRecordAfterSeriesRemoval(t *testing.T) {
 	for _, removal := range []string{"eviction", "gc"} {
 		t.Run(removal, func(t *testing.T) {
-			unlinked, resume := make(chan struct{}), make(chan struct{})
-			release := sync.OnceFunc(func() { close(resume) })
-			defer release()
-			var oldRef storage.SeriesRef
 			opts := newTestHeadDefaultOptions(10000, false)
 			opts.EnableMetadataWALRecords = true
-			if removal == "gc" {
-				opts.SeriesCallback = seriesEvictionPostDeletionCallback{postDeletion: func(deleted map[chunks.HeadSeriesRef]labels.Labels) {
-					if _, ok := deleted[chunks.HeadSeriesRef(oldRef)]; ok {
-						close(unlinked)
-						<-resume
-					}
-				}}
-			}
 			h, wal := newTestHeadWithOptions(t, compression.None, opts)
 			h.initTime(0)
 			lbls := labels.FromStrings("name", "removed")
 			creator, late := h.Appender(t.Context()), h.Appender(t.Context())
-			var err error
-			oldRef, err = creator.Append(0, lbls, 200, 1)
+			ref, err := creator.Append(0, lbls, 200, 1)
 			require.NoError(t, err)
-			// Metadata tracks a WAL series record without reserving the series against eviction.
-			_, err = late.UpdateMetadata(oldRef, lbls, metadata.Metadata{Help: "Old series metadata."})
+			// Metadata reserves the series it references until commit.
+			_, err = late.UpdateMetadata(ref, lbls, metadata.Metadata{Help: "Old series metadata."})
 			require.NoError(t, err)
 
-			// Leave the old series without a WAL series record after both write attempts fail.
+			// Leave the series without a WAL series record after the creator's write fails.
 			require.NoError(t, wal.Close())
 			require.Error(t, creator.Commit())
 			walDir := filepath.Join(t.TempDir(), "wal")
 			h.wal, err = wlog.New(nil, nil, walDir, compression.None)
 			require.NoError(t, err)
 
-			var newRef storage.SeriesRef
-			replace := func() {
-				app := h.Appender(t.Context())
-				newRef, err = app.Append(0, lbls, 300, 3)
-				require.NoError(t, err)
-				require.NotEqual(t, oldRef, newRef)
-				require.NoError(t, app.Commit())
-				require.NoError(t, late.Commit())
-			}
 			if removal == "eviction" {
-				h.testBeforeDeletingPostings = replace
-				deleted, err := h.gcSeries([]storage.SeriesRef{oldRef}, math.MaxInt64, func(*memSeries) bool { return true })
+				deleted, err := h.gcSeries([]storage.SeriesRef{ref}, math.MaxInt64, func(*memSeries) bool { return true })
 				require.NoError(t, err)
-				require.Len(t, deleted, 1)
+				require.Empty(t, deleted, "a series with pending metadata must not be evicted")
 			} else {
-				// Pause the stripe scan after unlinking, before Head.gc can finish its bookkeeping.
-				done := make(chan error, 1)
-				go func() { done <- h.Truncate(160) }()
-				select {
-				case <-unlinked:
-				case err := <-done:
-					t.Fatalf("truncation returned before unlinking: %v", err)
-				case <-time.After(10 * time.Second):
-					t.Fatal("truncation did not unlink the old series")
-				}
-				replace()
-				release()
-				require.NoError(t, <-done)
+				require.NoError(t, h.Truncate(160))
 			}
-
-			matcher := labels.MustNewMatcher(labels.MatchEqual, "name", "removed")
-			q, err := NewBlockQuerier(h, math.MinInt64, math.MaxInt64)
-			require.NoError(t, err)
-			before := query(t, q, matcher)
-			require.Len(t, before[lbls.String()], 1)
+			require.NotNil(t, h.series.getByID(chunks.HeadSeriesRef(ref)))
+			require.NoError(t, late.Commit())
 			require.NoError(t, h.Close())
 
-			for _, rec := range readTestWAL(t, walDir) {
-				if series, ok := rec.([]record.RefSeries); ok {
-					for _, s := range series {
-						require.Equal(t, chunks.HeadSeriesRef(newRef), s.Ref, "a reference removed from the head index must not get another series record")
-					}
-				}
-			}
-			replayWAL, err := wlog.New(nil, nil, walDir, compression.None)
-			require.NoError(t, err)
-			replayOpts := newTestHeadDefaultOptions(10000, false)
-			replayOpts.ChunkDirRoot = t.TempDir()
-			replayed, err := NewHead(nil, nil, replayWAL, nil, replayOpts, nil)
-			require.NoError(t, err)
-			t.Cleanup(func() { require.NoError(t, replayed.Close()) })
-			require.NoError(t, replayed.Init(math.MinInt64))
-			q, err = NewBlockQuerier(replayed, math.MinInt64, math.MaxInt64)
-			require.NoError(t, err)
-			require.Equal(t, before, query(t, q, matcher))
+			// The late appender logs the series record itself, before its metadata.
+			recs := readTestWAL(t, walDir)
+			require.GreaterOrEqual(t, len(recs), 2)
+			recs = recs[len(recs)-2:]
+			require.Equal(t, []record.RefSeries{{Ref: chunks.HeadSeriesRef(ref), Labels: lbls}}, recs[0])
+			require.IsType(t, []record.RefMetadata{}, recs[1])
 		})
 	}
 }
