@@ -250,17 +250,17 @@ func NewWriterWithOptions(ctx context.Context, fn string, opts WriterOptions) (*
 	}
 
 	// Main index file we are building.
-	f, err := NewFileWriter(fn)
+	f, err := newFileWriter(fn, version)
 	if err != nil {
 		return nil, err
 	}
 	// Temporary file for postings.
-	fP, err := NewFileWriter(fn + "_tmp_p")
+	fP, err := newFileWriter(fn+"_tmp_p", version)
 	if err != nil {
 		return nil, err
 	}
 	// Temporary file for posting offset table.
-	fPO, err := NewFileWriter(fn + "_tmp_po")
+	fPO, err := newFileWriter(fn+"_tmp_po", version)
 	if err != nil {
 		return nil, err
 	}
@@ -310,22 +310,28 @@ func (w *Writer) addPadding(size int) error {
 }
 
 type FileWriter struct {
-	f    *os.File
-	fbuf *bufio.Writer
-	pos  uint64
-	name string
+	f          *os.File
+	fbuf       *bufio.Writer
+	pos        uint64
+	name       string
+	allowLarge bool // V4 bounds series starts independently of the final file size.
 }
 
 func NewFileWriter(name string) (*FileWriter, error) {
+	return newFileWriter(name, FormatV2)
+}
+
+func newFileWriter(name string, version int) (*FileWriter, error) {
 	f, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0o666)
 	if err != nil {
 		return nil, err
 	}
 	return &FileWriter{
-		f:    f,
-		fbuf: bufio.NewWriterSize(f, 1<<22),
-		pos:  0,
-		name: name,
+		f:          f,
+		fbuf:       bufio.NewWriterSize(f, 1<<22),
+		pos:        0,
+		name:       name,
+		allowLarge: version == FormatV4,
 	}, nil
 }
 
@@ -335,18 +341,24 @@ func (fw *FileWriter) Pos() uint64 {
 
 func (fw *FileWriter) Write(bufs ...[]byte) error {
 	for _, b := range bufs {
+		if err := fw.checkSize(fw.pos + uint64(len(b))); err != nil {
+			return err
+		}
 		n, err := fw.fbuf.Write(b)
 		fw.pos += uint64(n)
 		if err != nil {
 			return err
 		}
-		// For now the index file must not grow beyond 64GiB. Some of the fixed-sized
-		// offset references in v1 are only 4 bytes large.
-		// Once we move to compressed/varint representations in those areas, this limitation
-		// can be lifted.
-		if fw.pos > 16*math.MaxUint32 {
-			return fmt.Errorf("%q %w", fw.name, ErrIndexExceeds64GiB)
-		}
+	}
+	return nil
+}
+
+func (fw *FileWriter) checkSize(size uint64) error {
+	if !fw.allowLarge && size > seriesByteAlign*math.MaxUint32 {
+		return fmt.Errorf("%q %w", fw.name, ErrIndexExceeds64GiB)
+	}
+	if fw.allowLarge && size > math.MaxInt {
+		return fmt.Errorf("%q exceeds addressable index size", fw.name)
 	}
 	return nil
 }
@@ -462,6 +474,17 @@ func (w *Writer) writeMeta() error {
 	return w.write(w.buf1.Get())
 }
 
+// seriesRefForOffset converts an absolute, aligned series start into a postings reference.
+func seriesRefForOffset(start uint64) (uint32, error) {
+	if start%seriesByteAlign != 0 {
+		return 0, fmt.Errorf("series not %d-byte aligned at %d", seriesByteAlign, start)
+	}
+	if start/seriesByteAlign > math.MaxUint32 {
+		return 0, fmt.Errorf("series start %d exceeds maximum representable offset %d", start, uint64(seriesByteAlign)*math.MaxUint32)
+	}
+	return uint32(start / seriesByteAlign), nil
+}
+
 // AddSeries adds the series one at a time along with its chunks.
 func (w *Writer) AddSeries(ref storage.SeriesRef, lset labels.Labels, chunks ...chunks.Meta) error {
 	if err := w.ensureStage(idxStageSeries); err != nil {
@@ -494,12 +517,12 @@ func (w *Writer) AddSeries(ref storage.SeriesRef, lset labels.Labels, chunks ...
 
 	// We add padding to 16 bytes to increase the addressable space we get through 4 byte
 	// series references.
+	start := (w.f.pos + seriesByteAlign - 1) &^ uint64(seriesByteAlign-1)
+	if _, err := seriesRefForOffset(start); err != nil {
+		return err
+	}
 	if err := w.addPadding(seriesByteAlign); err != nil {
 		return fmt.Errorf("failed to write padding bytes: %w", err)
-	}
-
-	if w.f.pos%seriesByteAlign != 0 {
-		return fmt.Errorf("series write not 16-byte aligned at %d", w.f.pos)
 	}
 
 	w.buf2.Reset()
@@ -791,10 +814,11 @@ func (w *Writer) writePostingsToTmpFiles() error {
 	for d.Len() > 0 {
 		d.ConsumePadding()
 		startPos := w.toc.LabelIndices - uint64(d.Len())
-		if startPos%seriesByteAlign != 0 {
-			return fmt.Errorf("series not 16-byte aligned at %d", startPos)
+		ref, err := seriesRefForOffset(startPos)
+		if err != nil {
+			return err
 		}
-		offsets = append(offsets, uint32(startPos/seriesByteAlign))
+		offsets = append(offsets, ref)
 		// Skip to next series.
 		x := d.Uvarint()
 		d.Skip(x + crc32.Size)
@@ -840,6 +864,10 @@ func (w *Writer) writePostingsToTmpFiles() error {
 		for d.Len() > 0 {
 			d.ConsumePadding()
 			startPos := w.toc.LabelIndices - uint64(d.Len())
+			ref, err := seriesRefForOffset(startPos)
+			if err != nil {
+				return err
+			}
 			l := d.Uvarint() // Length of this series in bytes.
 			startLen := d.Len()
 
@@ -853,7 +881,7 @@ func (w *Writer) writePostingsToTmpFiles() error {
 					if _, ok := postings[lno]; !ok {
 						postings[lno] = map[uint32][]uint32{}
 					}
-					postings[lno][lvo] = append(postings[lno][lvo], uint32(startPos/seriesByteAlign))
+					postings[lno][lvo] = append(postings[lno][lvo], ref)
 				}
 			}
 			// Skip to next series.
@@ -947,6 +975,11 @@ func (w *Writer) writePostings() error {
 		return err
 	}
 	w.postingsStart = w.f.pos
+
+	// The direct copy below bypasses FileWriter.Write. Check its final size first.
+	if err := w.f.checkSize(w.f.pos + w.fP.pos); err != nil {
+		return err
+	}
 
 	// Copy temporary file into main index.
 	if err := w.fP.Flush(); err != nil {
