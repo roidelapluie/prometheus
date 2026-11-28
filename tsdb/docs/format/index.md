@@ -381,7 +381,14 @@ This experimental layout uses `PPOT0002`; readers reject the earlier
 Readers validate directory bounds, ordering and page spans at open. Page CRC,
 value boundaries, ordering, routing fences and postings offsets are validated
 on first access. Returned label-value strings are valid only while the backing
-index remains open. The index remains subject to the 64 GiB total size limit.
+index remains open.
+
+V4 postings encode each series reference as the absolute start of its record
+divided by 16, in a uint32. The last representable start is therefore
+`16 × (2³² − 1)` bytes (64 GiB − 16 bytes). A series starting there may
+extend across 64 GiB, and the postings sections and TOC may follow it.
+This bound applies to series starts. There is no 64 GiB total file-size
+limit in V4.
 
 `ReadPostingsOffsetTable` recognizes V4 from a full index header. Consumers of
 extracted tables must use `ReadPostingsOffsetTableWithVersion` and provide a
