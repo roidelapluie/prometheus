@@ -1118,6 +1118,9 @@ func newReader(b ByteSlice, c io.Closer, postingsDecoder PostingsDecoder) (*Read
 		if r.toc.Symbols < HeaderLen || r.toc.Symbols > r.toc.Series || r.toc.Series > r.toc.LabelIndices || r.toc.LabelIndices > r.toc.Postings || r.toc.Postings > r.toc.PostingsTable || r.toc.PostingsTable > end {
 			return nil, errors.New("invalid V4 section bounds")
 		}
+		if r.toc.LabelIndicesTable != 0 && r.toc.LabelIndicesTable != r.toc.PostingsTable {
+			return nil, errors.New("invalid V4 label indices table offset")
+		}
 		h, err := checkedRange(r.b, r.toc.Symbols, 8)
 		if err != nil {
 			return nil, err
