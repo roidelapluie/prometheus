@@ -54,8 +54,8 @@ type (
 	}
 )
 
-func newPostingsTableBuilder(f *FileWriter) (*postingsTableBuilder, error) {
-	b := &postingsTableBuilder{file: f, start: f.pos, pos: f.pos, limit: 32, target: 64 << 10}
+func newPostingsTableBuilder(f *FileWriter, limit int) (*postingsTableBuilder, error) {
+	b := &postingsTableBuilder{file: f, start: f.pos, pos: f.pos, limit: limit, target: 64 << 10}
 	return b, b.write(make([]byte, pagedTableHeaderSize))
 }
 
@@ -473,7 +473,7 @@ func (w *Writer) writePagedPostingsOffsetTable() error {
 			f.Close()
 		}
 	}()
-	b, err := newPostingsTableBuilder(w.f)
+	b, err := newPostingsTableBuilder(w.f, w.postingsPageLimit)
 	if err != nil {
 		return err
 	}
