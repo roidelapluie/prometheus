@@ -266,6 +266,16 @@ All fixed-width integers below are unsigned and big-endian. CRCs use CRC32C
 (Castagnoli). File offsets are absolute. Padding may separate top-level
 sections, but pages inside the postings-offset table are contiguous.
 
+V4 omits the legacy label indices and their offset table. In the six-offset
+TOC, `Series ≤ LabelIndices ≤ Postings`. The writer sets `LabelIndices` to
+`Postings`. `LabelIndicesTable` is either zero or an alias for `PostingsTable`.
+
+Each series record begins at the next 16-byte boundary, with 0–15 zero padding
+bytes before its length field. In the all-series postings list, the references
+are exactly the starts of all series records divided by 16, in increasing order.
+For each label pair, its list contains exactly the references of the series
+carrying that pair, also in increasing order.
+
 ### V4 symbol table
 
 ```
@@ -369,11 +379,12 @@ The first postings offset is the absolute start of the first postings list in
 that page, including its length field. Postings offsets are strictly increasing
 in directory and value order. The next page's first postings offset, including
 across label groups, is the exclusive upper bound for the current page's lists.
-For the final page, the postings-offset table start supplies that bound. These
-spans include list framing and any alignment padding. They allow conservative
-postings-byte estimates without loading value pages, and avoid loading a
-neighboring page to find the end of a boundary entry. They do not describe
-matcher selectivity or the bytes of the corresponding series.
+For the final page, `PostingsTable` supplies that bound in both TOC representations.
+The last list ends after its declared payload and CRC. Any number of zero padding
+bytes may follow it before `PostingsTable`. These spans include list framing and
+padding. They allow conservative postings-byte estimates without loading value
+pages, and avoid loading a neighboring page to find the end of a boundary entry.
+They do not describe matcher selectivity or the bytes of the corresponding series.
 
 This experimental layout uses `PPOT0002`; readers reject the earlier
 `PPOT0001` layout rather than interpreting its descriptors as this format.

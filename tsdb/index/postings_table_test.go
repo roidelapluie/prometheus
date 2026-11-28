@@ -537,3 +537,142 @@ func TestIndexV4PostingsPageBounds(t *testing.T) {
 		}
 	}
 }
+
+func TestReader_V4FinalPostingsBound(t *testing.T) {
+	const padding = 8
+	path := filepath.Join(t.TempDir(), "index")
+	// Reserve room in the final frame so we can turn it into top-level padding
+	// without relocating the pages or their absolute directory offsets.
+	rawLen := 0
+	lists := 0
+	w, err := NewWriterWithOptions(t.Context(), path, WriterOptions{FormatVersion: FormatV4, PostingsEncoder: func(e *encoding.Encbuf, refs []uint32) error {
+		if err := EncodePostingsRaw(e, refs); err != nil {
+			return err
+		}
+		lists++
+		if lists == 2 { // The ordinary list follows all-series in key order.
+			rawLen = e.Len()
+			e.PutBytes(make([]byte, padding))
+		}
+		return nil
+	}})
+	require.NoError(t, err)
+	ls := labels.FromStrings("a", "b")
+	require.NoError(t, w.AddSymbol("a"))
+	require.NoError(t, w.AddSymbol("b"))
+	require.NoError(t, w.AddSeries(0, ls))
+	require.NoError(t, w.Close())
+	require.Equal(t, 2, lists)
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	toc, err := NewTOCFromByteSlice(realByteSlice(data))
+	require.NoError(t, err)
+	require.Equal(t, toc.PostingsTable, toc.LabelIndicesTable)
+	end := int(toc.PostingsTable)
+	frame := data[end-4-rawLen-padding-crc32.Size : end]
+	require.EqualValues(t, rawLen+padding, binary.BigEndian.Uint32(frame))
+	binary.BigEndian.PutUint32(frame, uint32(rawLen))
+	binary.BigEndian.PutUint32(frame[4+rawLen:], crc32.Checksum(frame[4:4+rawLen], castagnoliTable))
+	clear(frame[4+rawLen+crc32.Size:])
+
+	for _, tc := range []struct {
+		name              string
+		labelIndicesTable uint64
+		valid             bool
+	}{
+		{"absent", 0, true},
+		{"alias", toc.PostingsTable, true},
+		{"points into padding", toc.PostingsTable - 1, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Recompute the TOC checksum so the invalid case exercises the field check.
+			input := slices.Clone(data)
+			trailer := input[len(input)-indexTOCLen:]
+			binary.BigEndian.PutUint64(trailer[3*8:], tc.labelIndicesTable)
+			binary.BigEndian.PutUint32(trailer[len(trailer)-crc32.Size:], crc32.Checksum(trailer[:len(trailer)-crc32.Size], castagnoliTable))
+			r, err := NewReader(realByteSlice(input), DecodePostingsRaw)
+			if !tc.valid {
+				require.ErrorContains(t, err, "invalid V4 label indices table offset")
+				return
+			}
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, r.Close()) })
+			p, err := r.Postings(t.Context(), "a", "b")
+			require.NoError(t, err)
+			refs, err := ExpandPostings(p)
+			require.NoError(t, err)
+			require.Len(t, refs, 1)
+			var got labels.ScratchBuilder
+			require.NoError(t, r.Series(refs[0], &got, nil))
+			require.True(t, labels.Equal(ls, got.Labels()))
+			ranges, err := r.PostingsRanges()
+			require.NoError(t, err)
+			require.EqualValues(t, toc.PostingsTable-padding, ranges[labels.Label{Name: "a", Value: "b"}].End+crc32.Size)
+			require.Equal(t, toc.PostingsTable, r.paged.groups["a"].pages[0].postingsEnd)
+		})
+	}
+}
+
+func TestWriter_V4SeriesAndPostingsMembership(t *testing.T) {
+	// Some series share a pair; an empty value and an absent label have
+	// distinct postings. Include enough symbols to cross a sample boundary.
+	var series []labels.Labels
+	for i := range 48 {
+		ls := labels.FromStrings("id", strconv.Itoa(i))
+		if i%2 == 0 {
+			ls = labels.FromStrings("id", strconv.Itoa(i), "zone", "")
+		}
+		series = append(series, ls)
+	}
+	slices.SortFunc(series, labels.Compare)
+	data, err := os.ReadFile(writeFormatFixture(t, FormatV4, series))
+	require.NoError(t, err)
+	r, err := NewReader(realByteSlice(data), DecodePostingsRaw)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, r.Close()) })
+	symbols := r.Symbols()
+	var previous string
+	count := 0
+	for symbols.Next() {
+		if count > 0 {
+			require.Greater(t, symbols.At(), previous)
+		}
+		previous = symbols.At()
+		count++
+	}
+	require.NoError(t, symbols.Err())
+	require.Equal(t, len(series)+3, count) // The ID values plus "id", "zone" and the empty string.
+
+	// Walk record frames independently of all-postings so an omitted series is visible.
+	expected := map[labels.Label][]storage.SeriesRef{}
+	pos := r.toc.Series
+	for _, ls := range series {
+		start := (pos + seriesByteAlign - 1) &^ uint64(seriesByteAlign-1)
+		require.Less(t, start, r.toc.LabelIndices)
+		require.Equal(t, make([]byte, start-pos), data[pos:start])
+		body, prefix := binary.Uvarint(data[start:r.toc.LabelIndices])
+		require.Positive(t, prefix)
+		ref := storage.SeriesRef(start / seriesByteAlign)
+		var got labels.ScratchBuilder
+		require.NoError(t, r.Series(ref, &got, nil))
+		require.True(t, labels.Equal(ls, got.Labels()))
+		expected[labels.Label{}] = append(expected[labels.Label{}], ref)
+		ls.Range(func(l labels.Label) { expected[l] = append(expected[l], ref) })
+		pos = start + uint64(prefix) + body + crc32.Size
+	}
+	require.Equal(t, r.toc.LabelIndices, pos)
+	require.Equal(t, r.toc.Postings, r.toc.LabelIndices)
+
+	actual := map[labels.Label][]storage.SeriesRef{}
+	require.NoError(t, ReadPostingsOffsetTable(realByteSlice(data), r.toc.PostingsTable, func(name, value []byte, offset uint64, _ int) error {
+		key := labels.Label{Name: string(name), Value: string(value)}
+		require.NotContains(t, actual, key)
+		_, p, err := DecodePostingsRaw(encoding.NewDecbufAt(realByteSlice(data), int(offset), castagnoliTable))
+		if err != nil {
+			return err
+		}
+		actual[key], err = ExpandPostings(p)
+		return err
+	}))
+	require.Equal(t, expected, actual)
+}
