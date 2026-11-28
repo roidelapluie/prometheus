@@ -170,7 +170,8 @@ type Writer struct {
 
 	Version int
 
-	postingsEncoder PostingsEncoder
+	postingsEncoder   PostingsEncoder
+	postingsPageLimit int
 }
 
 // TOC represents the index Table Of Contents that states where each section of the index starts.
@@ -280,10 +281,11 @@ func NewWriterWithOptions(ctx context.Context, fn string, opts WriterOptions) (*
 		buf1: encoding.Encbuf{B: make([]byte, 0, 1<<22)},
 		buf2: encoding.Encbuf{B: make([]byte, 0, 1<<22)},
 
-		symbolCache:     make(map[string]uint32, 1<<16),
-		labelNames:      make(map[string]uint64, 1<<8),
-		crc32:           newCRC32(),
-		postingsEncoder: encoder,
+		symbolCache:       make(map[string]uint32, 1<<16),
+		labelNames:        make(map[string]uint64, 1<<8),
+		crc32:             newCRC32(),
+		postingsEncoder:   encoder,
+		postingsPageLimit: 32,
 	}
 	if err := iw.writeMeta(); err != nil {
 		return nil, err
